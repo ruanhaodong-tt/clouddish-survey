@@ -7,6 +7,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "serve": "node server-standalone.js",
     "pack": "electron-builder --dir --publish never",
     "dist": "electron-builder -mwl --publish never",
     "dist:win": "electron-builder --win --publish never",
