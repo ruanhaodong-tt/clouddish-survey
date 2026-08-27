@@ -1,5 +1,6 @@
 'use strict';
 const http = require('http');
+const https = require('https');
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
@@ -171,29 +172,51 @@ class SurveyServer {
   _pushWebhook(survey, response, total, from) {
     const wh = this.storage.getSettings().webhook;
     if (!wh || !wh.enabled || !wh.url) return;
-    const fields = Array.isArray(wh.fields) && wh.fields.length ? wh.fields : ['survey', 'answers', 'stats', 'meta'];
-    const payload = { event: 'response_created' };
-    if (fields.includes('survey')) payload.survey = { id: survey.id, title: survey.title, description: survey.description, questions: survey.questions };
-    if (fields.includes('answers')) payload.answers = readableAnswers(survey, response);
-    if (fields.includes('stats')) payload.stats = computeStats(survey, this.storage.getResponses(survey.id));
-    if (fields.includes('meta')) payload.meta = { submitId: response.id, submittedAt: response.submittedAt, total, from };
-    const tags = wh.tags && typeof wh.tags === 'object' ? wh.tags : {};
-    Object.keys(tags).forEach(k => {
-      const v = tags[k];
-      if (v !== '' && v != null) payload[k] = v;
-    });
 
-    const req = http.request(wh.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 5000
-    }, (res) => {
-      let body = '';
-      res.on('data', (c) => { body += c; });
-      res.on('end', () => {
-        this.storage.addWebhookLog({ ok: res.statusCode >= 200 && res.statusCode < 300, code: res.statusCode, body: body.slice(0, 200) });
+    let payload;
+    try {
+      const fields = Array.isArray(wh.fields) && wh.fields.length ? wh.fields : ['survey', 'answers', 'stats', 'meta'];
+      payload = { event: 'response_created' };
+      if (fields.includes('survey')) payload.survey = { id: survey.id, title: survey.title, description: survey.description, questions: survey.questions };
+      if (fields.includes('answers')) payload.answers = readableAnswers(survey, response);
+      if (fields.includes('stats')) payload.stats = computeStats(survey, this.storage.getResponses(survey.id));
+      if (fields.includes('meta')) payload.meta = { submitId: response.id, submittedAt: response.submittedAt, total, from };
+      const tags = wh.tags && typeof wh.tags === 'object' ? wh.tags : {};
+      Object.keys(tags).forEach(k => {
+        const v = tags[k];
+        if (v !== '' && v != null) payload[k] = v;
       });
-    });
+    } catch (e) {
+      this.storage.addWebhookLog({ ok: false, error: '构造推送数据失败: ' + String((e && e.message) || e).slice(0, 200) });
+      return;
+    }
+
+    let urlObj, mod;
+    try {
+      urlObj = new URL(wh.url);
+      mod = urlObj.protocol === 'https:' ? https : http;
+    } catch (e) {
+      this.storage.addWebhookLog({ ok: false, error: '接口地址无效: ' + String(wh.url).slice(0, 200) });
+      return;
+    }
+
+    let req;
+    try {
+      req = mod.request(urlObj, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 5000
+      }, (res) => {
+        let body = '';
+        res.on('data', (c) => { body += c; });
+        res.on('end', () => {
+          this.storage.addWebhookLog({ ok: res.statusCode >= 200 && res.statusCode < 300, code: res.statusCode, body: body.slice(0, 200) });
+        });
+      });
+    } catch (e) {
+      this.storage.addWebhookLog({ ok: false, error: '推送失败: ' + String((e && e.message) || e).slice(0, 200) });
+      return;
+    }
     req.on('error', (err) => {
       this.storage.addWebhookLog({ ok: false, error: String((err && err.message) || err).slice(0, 200) });
     });

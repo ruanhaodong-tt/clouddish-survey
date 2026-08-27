@@ -136,6 +136,14 @@ function req(method, p, body) {
     console.log('[16] webhook log last =', JSON.stringify(last));
     if (!last || last.ok !== true) throw new Error('webhook log not ok');
 
+    // https 地址的 webhook 不应让服务崩溃（TLS 失败只记日志）
+    storage.setWebhook({ enabled: true, url: 'https://127.0.0.1:8898/hook', fields: ['meta'], tags: {} });
+    const subHttps = await req('POST', '/submit', { id: q.id, answers: { qcq0k1: '1' } });
+    console.log('[16b] submit with https webhook ->', subHttps.status);
+    const h3 = await req('GET', '/health');
+    console.log('[16c] health alive after https webhook ->', h3.status);
+    if (h3.status !== 200) throw new Error('server crashed on https webhook');
+
     // 管理 API
     const areq = (method, p, body) => new Promise((resolve, reject) => {
       const data = body ? JSON.stringify(body) : null;
