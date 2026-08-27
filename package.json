@@ -1,0 +1,62 @@
+{
+  "name": "clouddish-survey",
+  "version": "1.0.0",
+  "description": "云问卷：本地HTTP服务端 + 端口传输的问卷收集与管理工具",
+  "main": "main.js",
+  "author": "一条大咸鱼",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder -mwl",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.xianyu.cloudsurvey",
+    "productName": "云问卷",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "storage.js",
+      "survey-template.html",
+      "renderer/**/*",
+      "assets/icon.png"
+    ],
+    "extraResources": [
+      { "from": "assets/icon.png", "to": "icon.png" }
+    ],
+    "win": {
+      "target": [
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "云问卷"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility",
+      "maintainer": "一条大咸鱼"
+    }
+  }
+}

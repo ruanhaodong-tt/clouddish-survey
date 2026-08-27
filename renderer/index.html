@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云问卷</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- 侧边栏 -->
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="logo">问</div>
+      <div>
+        <div class="brand-name">云问卷</div>
+        <div class="brand-sub">问卷收集管理工具</div>
+      </div>
+    </div>
+
+    <div class="section-title">我的问卷</div>
+    <div class="list-head">
+      <span id="qCount" class="count">0 份</span>
+      <button id="newBtn" class="btn primary small">新建问卷</button>
+    </div>
+    <ul id="qList"></ul>
+
+    <!-- 服务端控制 -->
+    <div class="share-card">
+      <div class="share-head">
+        <span class="dot" id="serverDot"></span>
+        <span id="serverState">服务未启动</span>
+      </div>
+      <div class="share-row">
+        <label>端口</label>
+        <input type="number" id="portInput" min="1" max="65535" value="8686">
+      </div>
+      <div class="share-row">
+        <label>分享问卷</label>
+        <select id="sharedSelect"></select>
+      </div>
+      <button id="serverToggle" class="btn primary">启动服务</button>
+      <div class="urls" id="urls"></div>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <main id="main">
+    <!-- 详情/统计 -->
+    <section id="detailView" class="view hidden">
+      <div class="detail-head">
+        <button id="backBtn" class="btn ghost">返回</button>
+        <div class="detail-title-wrap">
+          <h2 id="detailTitle"></h2>
+          <div class="meta" id="detailMeta"></div>
+        </div>
+        <div class="detail-actions">
+          <button id="editBtn" class="btn ghost">编辑</button>
+          <button id="clearBtn" class="btn ghost danger">清空数据</button>
+          <button id="exportCsvBtn" class="btn">导出CSV</button>
+          <button id="exportJsonBtn" class="btn">导出JSON</button>
+        </div>
+      </div>
+      <div id="statsBody"></div>
+      <div id="responseBody"></div>
+    </section>
+
+    <!-- 编辑器 -->
+    <section id="editorView" class="view hidden">
+      <div class="editor-head">
+        <button id="editorBackBtn" class="btn ghost">取消</button>
+        <h2 id="editorTitle">新建问卷</h2>
+        <button id="saveBtn" class="btn primary">保存问卷</button>
+      </div>
+      <div class="editor-body">
+        <div class="field">
+          <label>问卷标题</label>
+          <input type="text" id="qTitle" placeholder="请输入问卷标题">
+        </div>
+        <div class="field">
+          <label>问卷说明</label>
+          <textarea id="qDesc" rows="2" placeholder="填写问卷说明（可选）"></textarea>
+        </div>
+        <div class="field">
+          <div class="q-adder">
+            <span>题目列表</span>
+            <div>
+              <button class="btn small" data-type="single">+ 单选题</button>
+              <button class="btn small" data-type="multiple">+ 多选题</button>
+              <button class="btn small" data-type="text">+ 填空题</button>
+              <button class="btn small" data-type="rating">+ 评分题</button>
+            </div>
+          </div>
+          <div id="editorQuestions"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 空状态 -->
+    <section id="emptyView" class="view center">
+      <div class="empty-icon">问</div>
+      <h2>还没有问卷</h2>
+      <p>点击「新建问卷」创建第一份问卷，然后启动服务分享链接即可收取数据。</p>
+      <button id="emptyNewBtn" class="btn primary">新建问卷</button>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script src="chart.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

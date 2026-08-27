@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>__TITLE__ - 问卷</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;background:linear-gradient(135deg,#eef2ff 0%,#fdf4ff 100%);min-height:100vh;color:#1f2937;}
+  .page{max-width:720px;margin:0 auto;padding:28px 16px 60px;}
+  header{background:#fff;border-radius:16px;padding:28px 30px;box-shadow:0 8px 30px rgba(99,102,241,.12);margin-bottom:18px;}
+  header h1{font-size:26px;color:#312e81;}
+  header p{color:#6b7280;margin-top:8px;line-height:1.7;white-space:pre-wrap;}
+  .qi{background:#fff;border-radius:14px;padding:22px 26px;margin-bottom:16px;box-shadow:0 4px 18px rgba(0,0,0,.05);}
+  .qhead{display:flex;align-items:flex-start;gap:10px;font-size:17px;}
+  .qnum{flex:none;width:28px;height:28px;border-radius:8px;background:#4f46e5;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;}
+  .qtitle{flex:1;line-height:1.5;}
+  .qtype{flex:none;font-size:11px;color:#6366f1;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:3px 10px;margin-top:3px;}
+  .req{color:#ef4444;}
+  .qbody{margin-top:16px;}
+  .opts{display:flex;flex-direction:column;gap:10px;}
+  .opt{display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid #e5e7eb;border-radius:10px;cursor:pointer;transition:.15s;background:#fafafa;}
+  .opt:hover{border-color:#a5b4fc;background:#f5f6ff;}
+  .opt input{width:17px;height:17px;accent-color:#4f46e5;}
+  textarea{width:100%;border:1px solid #d1d5db;border-radius:10px;padding:10px 12px;font:inherit;resize:vertical;outline:none;}
+  textarea:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15);}
+  .stars{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .star{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
+  .star input{display:none;}
+  .star span{width:38px;height:38px;border-radius:10px;border:1px solid #d1d5db;display:flex;align-items:center;justify-content:center;font-size:15px;color:#4b5563;background:#fafafa;transition:.15s;}
+  .star input:checked + span{background:#4f46e5;color:#fff;border-color:#4f46e5;}
+  .star-hint{margin-left:6px;color:#6366f1;font-size:13px;}
+  footer{margin-top:18px;display:flex;flex-direction:column;gap:10px;align-items:center;}
+  #err{display:none;width:100%;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.7;}
+  #submitBtn{width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:17px;font-weight:600;cursor:pointer;box-shadow:0 6px 20px rgba(79,70,229,.35);}
+  #submitBtn:hover{filter:brightness(1.06);}
+  #submitBtn:disabled{opacity:.6;cursor:not-allowed;}
+  #success{display:none;background:#fff;border-radius:16px;padding:50px 30px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.08);}
+  #success .t{font-size:28px;}
+  #success h2{font-size:22px;color:#065f46;margin-top:14px;}
+  #success p{color:#6b7280;margin-top:8px;}
+  @media(max-width:520px){ header, .qi{padding:18px;} }
+</style>
+</head>
+<body>
+<div class="page">
+  <div id="formWrap">
+    <header><h1></h1></header>
+    <form id="surveyForm"></form>
+  </div>
+  <div id="success">
+    <div class="t">&#10004;</div>
+    <h2>提交成功</h2>
+    <p>感谢你的参与，你的回答已成功保存。</p>
+  </div>
+</div>
+<script>
+(function(){
+  var Q = __QUESTIONS__;
+  var QID = __QID__;
+  var BASE = __BASE__;
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+
+  var cls = { single:'单选题', multiple:'多选题', text:'填空题', rating:'评分题' };
+  var form = document.getElementById('surveyForm');
+  var h1 = document.querySelector('header h1');
+  var desc = document.createElement('p');
+  form.innerHTML = '';
+
+  Q.forEach(function(c, idx){
+    var num = String(idx+1).padStart(2,'0');
+    var reqMark = c.required ? ' <span class="req">*</span>' : '';
+    var control = '';
+    if(c.type === 'text'){
+      control = '<textarea name="'+c.id+'" rows="3" placeholder="请输入内容"></textarea>';
+    } else if(c.type === 'rating'){
+      var stars = '';
+      for(var i=1;i<=c.ratingMax;i++){
+        stars += '<label class="star"><input type="radio" name="'+c.id+'" value="'+i+'"><span>'+i+'</span></label>';
+      }
+      control = '<div class="stars">'+stars+'<span class="star-hint"></span></div>';
+    } else if(c.type === 'single'){
+      control = '<div class="opts">'+c.options.map(function(o,oi){
+        return '<label class="opt"><input type="radio" name="'+c.id+'" value="'+(oi+1)+'"><span>'+esc(o)+'</span></label>';
+      }).join('')+'</div>';
+    } else {
+      control = '<div class="opts">'+c.options.map(function(o,oi){
+        return '<label class="opt"><input type="checkbox" name="'+c.id+'" value="'+(oi+1)+'"><span>'+esc(o)+'</span></label>';
+      }).join('')+'</div>';
+    }
+    var row = document.createElement('div');
+    row.className = 'qi';
+    row.innerHTML = '<div class="qhead"><span class="qnum">'+num+'</span><span class="qtitle">'+esc(c.title)+reqMark+'</span><span class="qtype">'+cls[c.type]+'</span></div><div class="qbody">'+control+'</div>';
+    form.appendChild(row);
+  });
+
+  var foot = document.createElement('footer');
+  var err = document.createElement('div'); err.id='err';
+  var btn = document.createElement('button'); btn.type='submit'; btn.id='submitBtn'; btn.textContent='提交问卷';
+  foot.appendChild(err); foot.appendChild(btn);
+  form.appendChild(foot);
+
+  document.querySelectorAll('.stars').forEach(function(wrap){
+    wrap.querySelectorAll('input').forEach(function(input){
+      input.addEventListener('change', function(){ wrap.querySelector('.star-hint').textContent='已选择 '+input.value+' 分'; });
+    });
+  });
+
+  function validate(){
+    var errors = [];
+    Q.forEach(function(c){
+      var group = form.querySelectorAll('[name="'+c.id+'"]');
+      if(c.type==='text'){
+        var v = (group[0]||{}).value || '';
+        if(c.required && !v.trim()) errors.push('请填写「'+c.title+'」');
+        else if(v.trim().length>5000) errors.push('「'+c.title+'」内容过长');
+      } else {
+        var checked = Array.prototype.filter.call(group, function(i){ return i.checked; });
+        if(c.required && !checked.length) errors.push('请选择「'+c.title+'」');
+      }
+    });
+    return errors;
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var errs = validate();
+    if(errs.length){ err.innerHTML = errs.map(esc).join('<br>'); err.style.display='block'; return; }
+    err.style.display='none';
+    var answers = {};
+    Q.forEach(function(c){
+      var group = form.querySelectorAll('[name="'+c.id+'"]');
+      if(c.type==='text'){ answers[c.id] = (group[0]||{}).value.trim(); }
+      else { answers[c.id] = Array.prototype.filter.call(group, function(i){return i.checked;}).map(function(i){return i.value;}); }
+    });
+    btn.disabled=true; btn.textContent='提交中...';
+    fetch(BASE+'submit', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ id:QID, answers:answers })
+    }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){
+        if(res.ok){ document.getElementById('formWrap').style.display='none'; document.getElementById('success').style.display='block'; }
+        else { btn.disabled=false; btn.textContent='重新提交'; err.textContent=(res.j&&res.j.error)||'提交失败，请重试'; err.style.display='block'; }
+      })
+      .catch(function(){
+        btn.disabled=false; btn.textContent='重新提交';
+        err.textContent='网络错误，请检查连接后重试'; err.style.display='block';
+      });
+  });
+})();
+</script>
+</body>
+</html>
