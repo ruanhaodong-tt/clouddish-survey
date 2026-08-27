@@ -15,7 +15,7 @@ class Storage {
     this.sFile = path.join(dataDir, 'settings.json');
     this.questionnaires = [];
     this.responses = {}; // questionnaireId -> [response]
-    this.settings = { port: 8686, sharedId: null, webhook: null, webhookLog: [] };
+    this.settings = { port: 8686, sharedId: null, webhook: null, webhookLog: [], adminToken: null };
     this._load();
   }
 
@@ -37,7 +37,7 @@ class Storage {
     try {
       const raw = this._readJson(this.sFile);
       if (raw && typeof raw === 'object') {
-        this.settings = Object.assign({ port: 8686, sharedId: null, webhook: null, webhookLog: [] }, raw);
+        this.settings = Object.assign({ port: 8686, sharedId: null, webhook: null, webhookLog: [], adminToken: null }, raw);
         this.settings.webhook = Object.assign({ enabled: false, url: '', fields: ['survey', 'answers', 'stats', 'meta'], tags: {} }, raw.webhook || {});
         if (!Array.isArray(this.settings.webhookLog)) this.settings.webhookLog = [];
       }
@@ -154,6 +154,14 @@ class Storage {
   setShared(id) {
     this.settings.sharedId = id;
     this._saveS();
+  }
+
+  getAdminToken() { return this.settings.adminToken || ''; }
+
+  setAdminToken(token) {
+    this.settings.adminToken = (token || '').trim();
+    this._saveS();
+    return this.settings.adminToken;
   }
 
   // ------- webhook -------

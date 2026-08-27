@@ -18,11 +18,11 @@ const dataDir = process.env.SURVEY_DATA_DIR || path.join(os.homedir(), '.clouddi
 const port = parseInt(process.argv[2], 10) || 8686;
 const qFile = process.argv[3];
 
-// admin token：可用 SURVEY_ADMIN_TOKEN 固定；否则随机生成并打印
-const adminToken = process.env.SURVEY_ADMIN_TOKEN ||
-  ('cs' + crypto.randomBytes(9).toString('hex'));
-
 const storage = new Storage(dataDir);
+
+// 管理密码：SURVEY_ADMIN_TOKEN 优先；否则沿用已保存的；没有则随机生成并持久化
+const adminToken = process.env.SURVEY_ADMIN_TOKEN ||
+  (storage.getAdminToken() || storage.setAdminToken('cs' + crypto.randomBytes(9).toString('hex')));
 
 (async () => {
   // 导入指定问卷 JSON（可选）
@@ -65,7 +65,7 @@ const storage = new Storage(dataDir);
     console.log('问卷服务已启动');
     console.log('  答题页: http://<服务器IP>:' + st.port + '/');
     console.log('  管理页: http://<服务器IP>:' + st.port + '/admin');
-    console.log('  admin token: ' + adminToken + (process.env.SURVEY_ADMIN_TOKEN ? '' : '  (随机生成，下次启动会变化)'));
+    console.log('  管理密码: ' + adminToken + (process.env.SURVEY_ADMIN_TOKEN ? '  (来自 SURVEY_ADMIN_TOKEN)' : '  (首次随机生成，已保存，可在管理页修改)'));
     console.log('  查询接口: /api/survey  /api/responses  /api/stats');
     console.log('  提交接口: POST /submit');
     console.log('  数据目录: ' + dataDir);

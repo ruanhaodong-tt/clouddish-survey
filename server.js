@@ -315,13 +315,21 @@ class SurveyServer {
         return this._send(res, 200, { ok: true });
       }
 
-      if (req.method === 'POST' && ['/api/admin/survey', '/api/admin/share', '/api/admin/webhook'].includes(pathname)) {
+      if (req.method === 'POST' && ['/api/admin/survey', '/api/admin/share', '/api/admin/webhook', '/api/admin/password'].includes(pathname)) {
         let body = '';
         let size = 0;
         req.on('data', (chunk) => { size += chunk.length; if (size > 1048576) req.destroy(); else body += chunk; });
         req.on('end', () => {
           let payload;
           try { payload = JSON.parse(body || '{}'); } catch (e) { return this._send(res, 400, { error: '请求格式错误' }); }
+
+          if (pathname === '/api/admin/password') {
+            const next = String(payload.next || '').trim();
+            if (next.length < 4) return this._send(res, 400, { error: '新密码至少 4 位' });
+            this.storage.setAdminToken(next);
+            this.adminToken = next;
+            return this._send(res, 200, { ok: true });
+          }
 
           if (pathname === '/api/admin/survey') {
             const id = payload.id;

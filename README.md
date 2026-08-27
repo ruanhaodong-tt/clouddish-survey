@@ -45,9 +45,77 @@ npm install
 npm run dist:win       # 产出单文件版 + 安装包到 dist/
 ```
 
-## Linux 构建
+## Linux 服务器命令行部署（无界面，推荐）
 
-Linux 的 AppImage / deb 包需要在 **Linux 环境**（或 WSL/Docker）下构建，因为 electron-builder 不支持从 Windows 跨平台打包 Linux。
+云服务器没有图形界面时，用 Node 直接跑内置服务端即可，**无需 Electron、无需 `npm install`**。
+
+前置：服务器已安装 Node.js 14+（用 `node -v` 确认）。
+
+```bash
+# 拉取代码
+git clone https://github.com/ruanhaodong-tt/clouddish-survey.git
+cd clouddish-survey
+
+# 启动服务（端口 8686），首次启动自动创建一份示例问卷
+node server-standalone.js 8686
+```
+
+启动后访问：
+
+| 地址 | 说明 |
+|---|---|
+| `http://服务器IP:端口/` | 答题页（分享给受访者） |
+| `http://服务器IP:端口/admin` | 管理页（浏览器可视化建/编辑问卷、看统计与答卷、配置推送） |
+| `GET /api/survey` `GET /api/responses` `GET /api/stats` | 查询接口（程序化对接） |
+| `POST /submit` | 提交答卷 |
+
+环境变量（可选）：
+
+| 变量 | 说明 |
+|---|---|
+| `SURVEY_ADMIN_TOKEN` | 固定管理密码。不设置时首次随机生成并持久化保存，之后可在管理页「修改密码」 |
+| `SURVEY_DATA_DIR` | 数据目录（默认 `~/.clouddish-survey-data`） |
+| `SURVEY_WEBHOOK_URL` | 新答卷自动 `POST` 推送的地址（也可在管理页配置） |
+
+**后台常驻**（关闭终端不停）：
+
+方式一 `nohup`：
+
+```bash
+nohup node server-standalone.js 8686 > survey.log 2>&1 &
+tail -f survey.log        # 查看日志
+```
+
+方式二 `systemd`（开机自启，推荐）。新建 `/etc/systemd/system/cloudsurvey.service`：
+
+```ini
+[Unit]
+Description=Cloud Survey
+After=network.target
+
+[Service]
+WorkingDirectory=/www/clouddish-survey
+ExecStart=/usr/bin/node server-standalone.js 8686
+Restart=always
+Environment=SURVEY_ADMIN_TOKEN=你的管理密码
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now cloudsurvey   # 启动并设置开机自启
+sudo journalctl -u cloudsurvey -f         # 查看日志
+```
+
+> 公网访问前请在云控制台「安全组/防火墙」放行所用端口（默认 8686）。
+
+**导入现有问卷 JSON**：`node server-standalone.js 8686 问卷.json`
+
+## Linux 图形桌面版（可选）
+
+无图形界面的服务器不需要本小节。桌面 Linux 发行版想用带界面的桌面版时，再用 AppImage / deb（需要 Linux 环境构建，electron-builder 不支持从 Windows 跨平台打包 Linux）。
 
 在有 Node 18+ 的 Linux 机器上：
 
@@ -215,14 +283,15 @@ node examples/webhook-receiver.js   # 监听 3000 端口，实时打印推送的
 
 - **建问卷**：左侧「新建问卷」，添加单选/多选/填空/评分题目，可设必答、增删选项、调整评分上限
 - **编辑**：改标题/说明/题目，保存后自动成为当前分享问卷（答题页立即更新）
-- **统计与答卷**：按题查看计数、评分分布与平均分、文本答案，以及逐条答卷明细
+- **统计与答卷**：按题查看计数、评分分布与平均分、文本答案，以及逐条答卷明细；**每 3 秒自动刷新**，有新答卷实时更新
 - **推送配置**：接口地址、推送内容勾选、自定义标记、推送状态日志
 
-管理页受 **admin token** 保护，写操作需携带 token（未授权返回 401）：
+管理页受**管理密码**保护，写操作需携带密码（未授权返回 401）：
 
-- 启动时若设置了环境变量 `SURVEY_ADMIN_TOKEN`，则使用该值作为 token
-- 未设置时服务会自动生成一个随机 token 并打印在启动日志里（每次启动变化）
-- 打开 `/admin` 后填入 token 即可进入；token 会保存在浏览器本地，下次免输
+- 启动时若设置了环境变量 `SURVEY_ADMIN_TOKEN`，则用它作为管理密码
+- 未设置时首次启动会随机生成一个密码，打印在启动日志里，并**持久化保存**（重启不变）
+- 进入管理页后在右上角「修改密码」随时更换新密码
+- 密码会保存在浏览器本地，下次打开免输
 
 > 管理接口：`GET/POST /api/admin/surveys|survey|share|webhook`、`DELETE /api/admin/survey`，请求头携带 `Authorization: Bearer <token>`。所有管理接口在桌面版（Electron）中不启用。
 

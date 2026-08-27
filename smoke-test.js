@@ -188,11 +188,33 @@ function req(method, p, body) {
 
     const adminPage = await req('GET', '/admin');
     console.log('[26] GET /admin ->', adminPage.status, 'len=', adminPage.body.length);
-    if (adminPage.body.indexOf('云问卷') < 0) throw new Error('admin page missing');
+    if (adminPage.body.indexOf('问卷管理') < 0) throw new Error('admin page missing');
+
+    // 修改管理密码：改后旧 token 失效、新 token 可用
+    const pw1 = await areq('POST', '/api/admin/password', { next: 'newpass123' });
+    console.log('[27] admin change password ->', pw1.status);
+    if (pw1.status !== 200) throw new Error('change password failed');
+
+    const oldTok = await req('GET', '/api/admin/surveys');
+    console.log('[28] old token after change ->', oldTok.status);
+    if (oldTok.status !== 401) throw new Error('old token should be invalid');
+
+    const areq2 = (method, p) => new Promise((resolve, reject) => {
+      const r = http.request({ host: '127.0.0.1', port: 8899, path: p, method, headers: { 'Authorization': 'Bearer newpass123' } }, res => {
+        let b = '';
+        res.on('data', c => b += c);
+        res.on('end', () => resolve({ status: res.statusCode, body: b }));
+      });
+      r.on('error', reject);
+      r.end();
+    });
+    const newTok = await areq2('GET', '/api/admin/surveys');
+    console.log('[29] new token works ->', newTok.status);
+    if (newTok.status !== 200) throw new Error('new token should work');
 
     await server.stop();
     hook.close();
-    console.log('[27] server stopped, running =', server.isRunning());
+    console.log('[30] server stopped, running =', server.isRunning());
     console.log('ALL SMOKE TESTS PASSED');
   } catch (e) {
     console.error('SMOKE TEST FAILED:', e);

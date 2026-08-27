@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>云问卷 · 管理</title>
+<link rel="icon" href="data:,">
+<title>问卷管理</title>
 <style>
 :root {
   --primary: #2563eb; --primary-d: #1d4ed8;
@@ -83,17 +84,17 @@ th { color: var(--muted); font-weight: 600; }
 </head>
 <body>
 <header>
-  <div class="brand">云问卷 <small>服务端管理</small></div>
-  <div class="token-row">
-    <input id="token" type="password" placeholder="admin token">
+  <div class="token-row" style="margin-left:auto">
+    <input id="token" type="password" placeholder="管理密码">
     <button id="tokenBtn" class="btn primary">连接</button>
+    <button id="pwBtn" class="btn" hidden>修改密码</button>
   </div>
 </header>
 
 <div id="login" class="center-card">
-  <h3>需要管理员 token</h3>
-  <p>在服务器启动日志中找到 <code>admin token: csxxx</code> 填入即可；也可用 <code>SURVEY_ADMIN_TOKEN</code> 固定设置。</p>
-  <input id="tokenLogin" type="password" placeholder="请输入 admin token">
+  <h3>需要管理密码</h3>
+  <p>在服务器启动日志中找到 <code>管理密码: csxxx</code> 填入即可；也可用 <code>SURVEY_ADMIN_TOKEN</code> 固定设置。</p>
+  <input id="tokenLogin" type="password" placeholder="请输入管理密码">
   <button id="loginBtn" class="btn primary block">进入管理</button>
 </div>
 
@@ -386,8 +387,17 @@ async function shareSurvey(id) {
 }
 
 /* ---------------- 统计 ---------------- */
+let pollTimer = null;
+function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+function startPoll(fn) { stopPoll(); pollTimer = setInterval(fn, 3000); }
+
 async function openStats() {
   switchTab('stats');
+  await renderStats();
+  startPoll(renderStats);
+}
+
+async function renderStats() {
   const box = $('#statsBox');
   try {
     const st = await api('/api/stats');
@@ -425,6 +435,11 @@ async function openStats() {
 /* ---------------- 答卷 ---------------- */
 async function openResponses() {
   switchTab('responses');
+  await renderResponses();
+  startPoll(renderResponses);
+}
+
+async function renderResponses() {
   const box = $('#respBox');
   try {
     const d = await api('/api/responses');
@@ -537,6 +552,7 @@ async function connect() {
     await loadAll();
     $('#login').hidden = true;
     $('#app').hidden = false;
+    $('#pwBtn').hidden = false;
     switchTab('editor');
     toast('已连接');
   } catch (e) { /* 401 已由 api 处理 */ }
@@ -547,11 +563,21 @@ function switchTab(name) {
   ['editor', 'stats', 'responses', 'webhook'].forEach(n => {
     $('#tab-' + n).hidden = n !== name;
   });
+  if (name !== 'stats' && name !== 'responses') stopPoll();
 }
 
 /* ---------------- 事件 ---------------- */
 $('#loginBtn').onclick = connect;
 $('#tokenBtn').onclick = connect;
+$('#pwBtn').onclick = async () => {
+  const next = prompt('输入新的管理密码（至少 4 位）');
+  if (!next) return;
+  try {
+    await api('/api/admin/password', { method: 'POST', body: JSON.stringify({ next }) });
+    setToken(next);
+    toast('密码已修改');
+  } catch (e) { toast(e.message, true); }
+};
 $('#token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 $('#tokenLogin').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 
@@ -587,6 +613,7 @@ window._del = async (id) => { try { await deleteSurvey(id); } catch (e) { toast(
       await loadAll();
       $('#login').hidden = true;
       $('#app').hidden = false;
+      $('#pwBtn').hidden = false;
       switchTab('editor');
     } catch (e) { showLogin('token 已失效，请重新输入'); }
   }
