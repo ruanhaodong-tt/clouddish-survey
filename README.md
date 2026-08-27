@@ -82,6 +82,9 @@ chmod +x "云问卷-1.0.0-x86_64.AppImage"
 |---|---|---|
 | GET | `/` `/q` `/index` | 返回当前分享问卷的完整答题网页（浏览器直接打开即可作答） |
 | POST | `/submit` | 提交一份答卷（JSON） |
+| GET | `/api/survey` | 查询当前分享问卷的元数据（题目、选项、类型等） |
+| GET | `/api/responses` | 查询已收集的全部答卷 |
+| GET | `/api/stats` | 查询答卷统计（计数、平均分、文本答案） |
 | GET | `/health` | 健康检查，返回服务与当前分享问卷信息 |
 | OPTIONS | 任意 | CORS 预检（跨域调用时自动处理） |
 
@@ -120,6 +123,91 @@ curl -X POST http://192.168.1.188:8686/submit \
 失败时返回对应状态码与错误说明（`400` 格式错误、`404` 问卷不存在等）。
 
 > 题目 ID 可在数据目录 `questionnaires.json` 中查看，或在建模后从管理端获得。普通用户也可以完全忽略它——直接用浏览器打开分享链接答题即可。
+
+### 查询问卷信息
+
+三个查询接口返回当前**正在分享**的那份问卷的数据，未分享时返回 `404`。
+
+- `GET /api/survey` —— 问卷元数据（标题、说明、题目及选项）与答卷数：
+
+```json
+{
+  "ok": true,
+  "survey": {
+    "id": "qab12cd3",
+    "title": "用户满意度调查",
+    "description": "",
+    "questions": [
+      { "id": "cqx0k1", "type": "single", "title": "性别", "required": true, "options": ["男", "女"], "ratingMax": 5 }
+    ],
+    "createdAt": 1787800000000
+  },
+  "responses": 12
+}
+```
+
+- `GET /api/responses` —— 全部答卷列表：
+
+```json
+{
+  "ok": true,
+  "total": 2,
+  "responses": [
+    { "id": "r...", "submittedAt": 1787800000000, "answers": { "cqx0k1": "1", "cqx0k2": ["1", "3"] } }
+  ]
+}
+```
+
+- `GET /api/stats` —— 统计结果（各题计数 / 评分分布与平均分 / 文本答案）：
+
+```json
+{
+  "ok": true,
+  "total": 2,
+  "byQuestion": {
+    "cqx0k1": { "type": "single", "title": "性别", "options": [ { "option": "男", "index": 1, "count": 1 }, { "option": "女", "index": 2, "count": 1 } ] },
+    "cqx0k4": { "type": "rating", "title": "满意", "ratingMax": 5, "distribution": { "1": 0, "2": 0, "3": 0, "4": 1, "5": 0 }, "average": 4 }
+  }
+}
+```
+
+### 新答卷推送（webhook）
+
+在管理端「新答卷推送」面板配置一个**自建后端接口地址**，启用后每当有人提交一份答卷，本工具会立即把答卷数据 `POST` 到该地址，无需轮询即可实时收到。
+
+面板可选项：
+- **接口地址**：你的后端接收接口（如 `http://192.168.1.100:3000/hook`）
+- **推送内容（可多选）**：问卷信息 / 答卷答案 / 统计数据 / 元信息
+- **自定义标记**：任意 `key: value`，随推送一起携带（如 `source: 地推A组`），便于后端识别来源
+- 面板底部显示最近推送状态（成功/失败、HTTP 码、时间）
+
+推送请求为 `POST`，`Content-Type: application/json`，全部勾选时结构如下：
+
+```json
+{
+  "event": "response_created",
+  "survey": { "id": "qab12cd3", "title": "用户满意度调查", "questions": [ ... ] },
+  "answers": {
+    "cqx0k1": { "type": "single", "title": "性别", "value": "男" },
+    "cqx0k2": { "type": "multiple", "title": "兴趣", "value": ["篮球", "电竞"] },
+    "cqx0k4": { "type": "rating", "title": "满意", "value": 4 }
+  },
+  "stats": { "total": 12, "byQuestion": { ... } },
+  "meta": { "submitId": "r...", "submittedAt": 1787800000000, "total": 12, "from": "192.168.1.66" },
+  "source": "地推A组"
+}
+```
+
+- 单选/评分答案已转为可读文本或数值；多选为文本数组
+- 若推送失败（地址不可达、超时 5s、非 2xx），会在面板日志中记录失败原因，且不影响答卷正常入库
+
+想快速搭一个接收端验证？仓库自带极简示例：
+
+```bash
+node examples/webhook-receiver.js   # 监听 3000 端口，实时打印推送的答卷
+```
+
+然后在管理端把接口地址填成 `http://127.0.0.1:3000` 并启用即可。
 
 ## 说明
 

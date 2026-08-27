@@ -43,6 +43,37 @@
       <button id="serverToggle" class="btn primary">启动服务</button>
       <div class="urls" id="urls"></div>
     </div>
+
+    <!-- 推送配置 -->
+    <details class="push-card" id="pushCard" open>
+      <summary>
+        <span>新答卷推送</span>
+        <span class="push-state" id="pushState">未配置</span>
+      </summary>
+      <div class="share-row">
+        <label>接口地址</label>
+        <input type="text" id="whUrl" placeholder="http://后端地址/hook">
+      </div>
+      <div class="wh-block">
+        <div class="wh-title">推送内容（可多选）</div>
+        <div class="wh-fields">
+          <label><input type="checkbox" data-field="survey"> 问卷信息</label>
+          <label><input type="checkbox" data-field="answers"> 答卷答案</label>
+          <label><input type="checkbox" data-field="stats"> 统计数据</label>
+          <label><input type="checkbox" data-field="meta"> 元信息</label>
+        </div>
+      </div>
+      <div class="wh-block">
+        <div class="wh-title">自定义标记</div>
+        <div id="whTags"></div>
+        <button id="addTagBtn" class="btn small ghost">+ 添加标记</button>
+      </div>
+      <div class="wh-actions">
+        <label class="wh-enable"><input type="checkbox" id="whEnabled"> 启用推送</label>
+        <button id="whSaveBtn" class="btn primary small">保存配置</button>
+      </div>
+      <div class="wh-log" id="whLog"></div>
+    </details>
   </aside>
 
   <!-- 主区 -->

@@ -37,6 +37,27 @@ function req(method, p, body) {
 
 (async () => {
   try {
+    // webhook 接收端
+    let received = null;
+    const hook = http.createServer((hreq, hres) => {
+      let b = '';
+      hreq.on('data', c => b += c);
+      hreq.on('end', () => {
+        received = JSON.parse(b);
+        hres.writeHead(200, { 'Content-Type': 'text/plain' });
+        hres.end('ok');
+      });
+    });
+    await new Promise(r => hook.listen(8898, '127.0.0.1', r));
+
+    // 配置 webhook：全选字段 + 自定义标记
+    storage.setWebhook({
+      enabled: true,
+      url: 'http://127.0.0.1:8898/hook',
+      fields: ['survey', 'answers', 'stats', 'meta'],
+      tags: { source: 'smoke-test' }
+    });
+
     await server.start(8899, q.id);
     console.log('[1] server started, running =', server.isRunning());
 
@@ -63,6 +84,7 @@ function req(method, p, body) {
     // unknown id
     const r3 = await req('POST', '/submit', { id: 'nope', answers: {} });
     console.log('[6] POST unknown ->', r3.status);
+    if (r3.status !== 404) throw new Error('unknown id should 404');
 
     // bad json
     const r4 = await new Promise((resolve, reject) => {
@@ -72,14 +94,51 @@ function req(method, p, body) {
       rr.on('error', reject); rr.write('notjson'); rr.end();
     });
     console.log('[7] POST badjson ->', r4.status, r4.body);
+    if (r4.status !== 400) throw new Error('bad json should 400');
 
     // export data via storage (simulate stat reader)
     const rows = storage.getResponses(q.id);
     console.log('[8] response[0].answers =', JSON.stringify(rows[0].answers));
     console.log('[9] response[1].answers =', JSON.stringify(rows[1].answers));
 
+    // API 查询
+    const apiS = await req('GET', '/api/survey');
+    const apiSJ = JSON.parse(apiS.body);
+    console.log('[10] GET /api/survey ->', apiS.status, 'questions=', apiSJ.survey.questions.length, 'responses=', apiSJ.responses);
+    if (!apiSJ.survey || apiSJ.survey.questions.length !== 4) throw new Error('api survey wrong');
+
+    const apiR = await req('GET', '/api/responses');
+    const apiRJ = JSON.parse(apiR.body);
+    console.log('[11] GET /api/responses ->', apiR.status, 'total=', apiRJ.total);
+    if (apiRJ.total !== 2) throw new Error('api responses wrong total');
+
+    const apiSt = await req('GET', '/api/stats');
+    const apiStJ = JSON.parse(apiSt.body);
+    console.log('[12] GET /api/stats ->', apiSt.status, 'avg=', apiStJ.byQuestion[id4] && apiStJ.byQuestion[id4].average);
+    if (apiStJ.byQuestion[id4].average !== 3) throw new Error('api stats average wrong (expect 3)');
+
+    // webhook 推送（第三次提交触发）
+    const a3 = {};
+    a3[id1] = '1'; a3[id4] = '3';
+    const r5 = await req('POST', '/submit', { id: q.id, answers: a3 });
+    console.log('[13] POST submit(webhook trigger) ->', r5.status, r5.body);
+    await new Promise(r => setTimeout(r, 400));
+
+    console.log('[14] webhook payload keys =', received ? Object.keys(received).join(',') : 'NONE');
+    if (!received || received.event !== 'response_created') throw new Error('webhook not received');
+    if (!received.survey || !received.answers || !received.stats || !received.meta) throw new Error('webhook fields missing');
+    if (received.source !== 'smoke-test') throw new Error('custom tag missing');
+    if (received.meta.total !== 3) throw new Error('webhook meta.total wrong');
+    console.log('[15] webhook answer readable =', JSON.stringify(received.answers[id1]));
+
+    const wh = storage.getWebhook();
+    const last = wh.log[wh.log.length - 1];
+    console.log('[16] webhook log last =', JSON.stringify(last));
+    if (!last || last.ok !== true) throw new Error('webhook log not ok');
+
     await server.stop();
-    console.log('[10] server stopped, running =', server.isRunning());
+    hook.close();
+    console.log('[17] server stopped, running =', server.isRunning());
     console.log('ALL SMOKE TESTS PASSED');
   } catch (e) {
     console.error('SMOKE TEST FAILED:', e);

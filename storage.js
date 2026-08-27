@@ -15,7 +15,7 @@ class Storage {
     this.sFile = path.join(dataDir, 'settings.json');
     this.questionnaires = [];
     this.responses = {}; // questionnaireId -> [response]
-    this.settings = { port: 8686, sharedId: null };
+    this.settings = { port: 8686, sharedId: null, webhook: null, webhookLog: [] };
     this._load();
   }
 
@@ -37,7 +37,9 @@ class Storage {
     try {
       const raw = this._readJson(this.sFile);
       if (raw && typeof raw === 'object') {
-        this.settings = Object.assign({ port: 8686, sharedId: null }, raw);
+        this.settings = Object.assign({ port: 8686, sharedId: null, webhook: null, webhookLog: [] }, raw);
+        this.settings.webhook = Object.assign({ enabled: false, url: '', fields: ['survey', 'answers', 'stats', 'meta'], tags: {} }, raw.webhook || {});
+        if (!Array.isArray(this.settings.webhookLog)) this.settings.webhookLog = [];
       }
     } catch (e) { /* defaults */ }
   }
@@ -151,6 +153,36 @@ class Storage {
 
   setShared(id) {
     this.settings.sharedId = id;
+    this._saveS();
+  }
+
+  // ------- webhook -------
+  getWebhook() {
+    return {
+      config: Object.assign({}, this.settings.webhook),
+      log: (this.settings.webhookLog || []).slice()
+    };
+  }
+
+  setWebhook(config) {
+    const c = config || {};
+    let url = String(c.url || '').trim();
+    if (url && !/^https?:\/\//i.test(url)) url = 'http://' + url;
+    this.settings.webhook = {
+      enabled: !!c.enabled && !!url,
+      url,
+      fields: Array.isArray(c.fields) ? c.fields.filter(f => ['survey', 'answers', 'stats', 'meta'].includes(f)) : [],
+      tags: (c.tags && typeof c.tags === 'object') ? c.tags : {}
+    };
+    this._saveS();
+    return Object.assign({}, this.settings.webhook);
+  }
+
+  addWebhookLog(entry) {
+    const log = this.settings.webhookLog || [];
+    log.push(Object.assign({ time: Date.now() }, entry));
+    while (log.length > 50) log.shift();
+    this.settings.webhookLog = log;
     this._saveS();
   }
 }

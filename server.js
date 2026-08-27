@@ -24,6 +24,66 @@ function esc(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// 统计：与管理端图表逻辑保持一致，供 /api/stats 与 webhook 使用
+function computeStats(survey, rows) {
+  const total = rows.length;
+  const byQuestion = {};
+  survey.questions.forEach(c => {
+    if (c.type === 'text') {
+      byQuestion[c.id] = {
+        type: c.type, title: c.title,
+        texts: rows.map(r => r.answers[c.id]).filter(v => v != null && String(v).trim() !== '')
+      };
+      return;
+    }
+    if (c.type === 'rating') {
+      const distribution = {};
+      for (let i = 1; i <= c.ratingMax; i++) distribution[String(i)] = 0;
+      rows.forEach(r => {
+        const v = r.answers[c.id];
+        if (v != null && v !== '') distribution[String(v)] = (distribution[String(v)] || 0) + 1;
+      });
+      let sum = 0, n = 0;
+      Object.keys(distribution).forEach(k => { sum += distribution[k] * Number(k); n += distribution[k]; });
+      byQuestion[c.id] = {
+        type: c.type, title: c.title, ratingMax: c.ratingMax,
+        distribution, average: n ? +(sum / n).toFixed(2) : 0
+      };
+      return;
+    }
+    const map = {};
+    rows.forEach(r => {
+      const v = r.answers[c.id];
+      if (Array.isArray(v)) v.forEach(x => { const k = String(x); map[k] = (map[k] || 0) + 1; });
+      else if (v != null && v !== '') { const k = String(v); map[k] = (map[k] || 0) + 1; }
+    });
+    byQuestion[c.id] = {
+      type: c.type, title: c.title,
+      options: c.options.map((label, idx) => ({ option: label, index: idx + 1, count: map[String(idx + 1)] || 0 }))
+    };
+  });
+  return { total, byQuestion };
+}
+
+// 答卷答案转为可读文本
+function readableAnswers(survey, response) {
+  const out = {};
+  survey.questions.forEach(c => {
+    const v = response.answers[c.id];
+    if (v == null || v === '') return;
+    if (Array.isArray(v)) {
+      out[c.id] = { type: c.type, title: c.title, value: v.map(x => c.options[Number(x) - 1]).filter(Boolean) };
+    } else if (c.type === 'rating') {
+      out[c.id] = { type: c.type, title: c.title, value: Number(v) };
+    } else if (c.type === 'single') {
+      out[c.id] = { type: c.type, title: c.title, value: c.options[Number(v) - 1] || v };
+    } else {
+      out[c.id] = { type: c.type, title: c.title, value: v };
+    }
+  });
+  return out;
+}
+
 class SurveyServer {
   constructor(storage) {
     this.storage = storage;
@@ -96,6 +156,47 @@ class SurveyServer {
     res.end(html ? obj : JSON.stringify(obj));
   }
 
+  _clientIp(req) {
+    return String((req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
+  }
+
+  _pushWebhook(survey, response, total, from) {
+    const wh = this.storage.getSettings().webhook;
+    if (!wh || !wh.enabled || !wh.url) return;
+    const fields = Array.isArray(wh.fields) && wh.fields.length ? wh.fields : ['survey', 'answers', 'stats', 'meta'];
+    const payload = { event: 'response_created' };
+    if (fields.includes('survey')) payload.survey = { id: survey.id, title: survey.title, description: survey.description, questions: survey.questions };
+    if (fields.includes('answers')) payload.answers = readableAnswers(survey, response);
+    if (fields.includes('stats')) payload.stats = computeStats(survey, this.storage.getResponses(survey.id));
+    if (fields.includes('meta')) payload.meta = { submitId: response.id, submittedAt: response.submittedAt, total, from };
+    const tags = wh.tags && typeof wh.tags === 'object' ? wh.tags : {};
+    Object.keys(tags).forEach(k => {
+      const v = tags[k];
+      if (v !== '' && v != null) payload[k] = v;
+    });
+
+    const req = http.request(wh.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 5000
+    }, (res) => {
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => {
+        this.storage.addWebhookLog({ ok: res.statusCode >= 200 && res.statusCode < 300, code: res.statusCode, body: body.slice(0, 200) });
+      });
+    });
+    req.on('error', (err) => {
+      this.storage.addWebhookLog({ ok: false, error: String((err && err.message) || err).slice(0, 200) });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      this.storage.addWebhookLog({ ok: false, error: '推送超时(5s)' });
+    });
+    req.write(JSON.stringify(payload));
+    req.end();
+  }
+
   _handle(req, res) {
     const url = new URL(req.url, 'http://localhost');
     const pathname = url.pathname.replace(/\/+$/, '') || '/';
@@ -128,9 +229,40 @@ class SurveyServer {
           if (Object.prototype.hasOwnProperty.call(answers, c.id)) clean[c.id] = answers[c.id];
         });
         const count = this.storage.addResponse(survey.id, clean);
+        const all = this.storage.getResponses(survey.id);
+        const last = all[all.length - 1];
+        if (last) this._pushWebhook(survey, last, count, this._clientIp(req));
         return this._send(res, 200, { ok: true, total: count });
       });
       return;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/survey') {
+      const survey = this.storage.getQuestionnaire(sharedId);
+      if (!survey) return this._send(res, 404, { error: '问卷不存在或尚未分享' });
+      return this._send(res, 200, {
+        ok: true,
+        survey: { id: survey.id, title: survey.title, description: survey.description, questions: survey.questions, createdAt: survey.createdAt },
+        responses: this.storage.countResponses(survey.id)
+      });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/responses') {
+      const survey = this.storage.getQuestionnaire(sharedId);
+      if (!survey) return this._send(res, 404, { error: '问卷不存在或尚未分享' });
+      const rows = this.storage.getResponses(survey.id);
+      return this._send(res, 200, {
+        ok: true,
+        total: rows.length,
+        responses: rows.map(r => ({ id: r.id, submittedAt: r.submittedAt, answers: r.answers }))
+      });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/stats') {
+      const survey = this.storage.getQuestionnaire(sharedId);
+      if (!survey) return this._send(res, 404, { error: '问卷不存在或尚未分享' });
+      const stats = computeStats(survey, this.storage.getResponses(survey.id));
+      return this._send(res, 200, Object.assign({ ok: true }, stats));
     }
 
     if (req.method === 'GET' && pathname === '/health') {

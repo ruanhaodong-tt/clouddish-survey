@@ -138,6 +138,10 @@ ipcMain.handle('server:stop', async () => {
   return { ok: true };
 });
 
+/* ---------------- IPC: webhook 推送配置 ---------------- */
+ipcMain.handle('webhook:get', () => storage.getWebhook());
+ipcMain.handle('webhook:set', (e, config) => storage.setWebhook(config));
+
 app.whenReady().then(() => {
   storage = new Storage(getDataDir());
   server = new SurveyServer(storage);

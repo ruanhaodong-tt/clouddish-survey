@@ -6,6 +6,7 @@ const state = {
   responses: {},
   settings: { port: 8686, sharedId: null },
   server: { running: false, port: null, sharedId: null, addresses: [] },
+  webhook: { config: { enabled: false, url: '', fields: ['survey', 'answers', 'stats', 'meta'], tags: {} }, log: [] },
   editing: null,      // {id:null}=新建, {id}=编辑
   draftQuestions: []
 };
@@ -419,6 +420,79 @@ async function toggleServer() {
   renderList();
 }
 
+/* ---------------- 推送配置 ---------------- */
+function tagRow(k, v) {
+  const row = document.createElement('div');
+  row.className = 'tag-row';
+  const kInp = document.createElement('input');
+  kInp.placeholder = '标记名'; kInp.value = k || '';
+  const vInp = document.createElement('input');
+  vInp.placeholder = '值'; vInp.value = v || '';
+  const del = document.createElement('button');
+  del.className = 'tag-del'; del.textContent = '×';
+  del.onclick = () => row.remove();
+  row.appendChild(kInp); row.appendChild(vInp); row.appendChild(del);
+  return row;
+}
+
+function renderWhTags() {
+  const body = $('#whTags');
+  body.innerHTML = '';
+  const tags = state.webhook.config.tags || {};
+  const keys = Object.keys(tags);
+  if (!keys.length) body.appendChild(tagRow('', ''));
+  keys.forEach(k => body.appendChild(tagRow(k, tags[k])));
+}
+
+function renderWhLog() {
+  const body = $('#whLog');
+  const log = state.webhook.log || [];
+  body.innerHTML = '';
+  if (!log.length) {
+    body.innerHTML = '<div class="wh-log-empty">暂无推送记录</div>';
+    return;
+  }
+  log.slice(-5).reverse().forEach(e => {
+    const d = document.createElement('div');
+    d.className = 'wh-log-item';
+    const detail = e.ok ? ('HTTP ' + e.code) : (e.error || 'HTTP ' + e.code);
+    d.innerHTML = (e.ok ? '<span class="ok">成功</span>' : '<span class="fail">失败</span>') +
+      '<span>' + esc(detail) + '</span><span>' + fmtTime(e.time) + '</span>';
+    body.appendChild(d);
+  });
+}
+
+function renderWhState() {
+  const cfg = state.webhook.config || {};
+  $('#whUrl').value = cfg.url || '';
+  $('#whEnabled').checked = !!cfg.enabled;
+  const fields = cfg.fields && cfg.fields.length ? cfg.fields : ['survey', 'answers', 'stats', 'meta'];
+  document.querySelectorAll('#whFields input[type=checkbox]').forEach(cb => {
+    cb.checked = fields.indexOf(cb.dataset.field) >= 0;
+  });
+  const st = $('#pushState');
+  if (!cfg.url) { st.textContent = '未配置'; st.className = 'push-state'; }
+  else if (cfg.enabled) { st.textContent = '已启用'; st.className = 'push-state on'; }
+  else { st.textContent = '未启用'; st.className = 'push-state'; }
+  renderWhTags();
+  renderWhLog();
+}
+
+async function saveWebhook() {
+  const fields = [];
+  document.querySelectorAll('#whFields input[type=checkbox]').forEach(cb => { if (cb.checked) fields.push(cb.dataset.field); });
+  const tags = {};
+  document.querySelectorAll('#whTags .tag-row').forEach(row => {
+    const k = row.querySelector('input').value.trim();
+    const v = row.querySelectorAll('input')[1].value;
+    if (k) tags[k] = v;
+  });
+  const saved = await bridge.webhookSet({ enabled: $('#whEnabled').checked, url: $('#whUrl').value.trim(), fields, tags });
+  state.webhook.config = saved;
+  toast(saved.enabled && saved.url ? '推送配置已保存并启用' : '推送配置已保存', 'ok');
+  renderWhState();
+}
+
 /* ---------------- 事件绑定 ---------------- */
 function bind() {
   $('#newBtn').onclick = () => openEditor(null);
@@ -460,6 +534,13 @@ function bind() {
   bridge.onToast(t => toast(t.text, t.type));
 
   $('#portInput').addEventListener('blur', () => { state.settings.port = Number($('#portInput').value) || 8686; });
+
+  $('#whSaveBtn').onclick = saveWebhook;
+  $('#addTagBtn').onclick = () => {
+    if (!state.webhook.config.tags) state.webhook.config.tags = {};
+    state.webhook.config.tags['k' + Date.now().toString(36)] = '';
+    renderWhTags();
+  };
 }
 
 function emptyIfNone() {
@@ -475,9 +556,11 @@ async function init() {
   state.responses = data.responses;
   state.settings = data.settings;
   state.server = data.serverStatus;
+  state.webhook = await bridge.webhookGet();
   bind();
   renderList();
   renderShareCard();
+  renderWhState();
   if (state.questionnaires.length) {
     state.selected = state.questionnaires[0].id;
     openDetail(state.selected);

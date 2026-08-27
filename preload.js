@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('api', {
   // 服务端
   serverStart: (port, sharedId) => ipcRenderer.invoke('server:start', port, sharedId),
   serverStop: () => ipcRenderer.invoke('server:stop'),
+  // webhook 推送配置
+  webhookGet: () => ipcRenderer.invoke('webhook:get'),
+  webhookSet: (config) => ipcRenderer.invoke('webhook:set', config),
   // 事件
   onServerStatus: (cb) => ipcRenderer.on('server-status', (e, s) => cb(s)),
   onToast: (cb) => ipcRenderer.on('toast', (e, t) => cb(t))
