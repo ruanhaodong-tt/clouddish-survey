@@ -62,7 +62,10 @@ input:focus, select:focus { border-color: var(--primary); }
 .q-head .t-flex { flex: 1; }
 .opt-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
 .opt-row input { flex: 1; }
+.opt-move { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0 3px; }
+.opt-move:hover { color: var(--primary); }
 .opt-del { border: none; background: none; color: var(--danger); cursor: pointer; font-size: 15px; padding: 0 4px; }
+.presets { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .opt-add, .q-add { margin-top: 4px; }
 .check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); }
 .check input { width: auto; }
@@ -140,9 +143,10 @@ th { color: var(--muted); font-weight: 600; }
           <label><input type="checkbox" data-field="stats"> 统计数据</label>
           <label><input type="checkbox" data-field="meta"> 元信息</label>
         </div>
-        <label>自定义标记</label>
+        <label>自定义标记（附加到推送数据，如区分来源/渠道）</label>
+        <div class="presets" id="whPresets"></div>
         <div id="whTags"></div>
-        <button id="addTagBtn" class="btn small" style="margin:6px 0 12px">+ 添加标记</button>
+        <button id="addTagBtn" class="btn small" style="margin:6px 0 12px">+ 自定义标记</button>
         <button id="whSaveBtn" class="btn primary">保存推送配置</button>
       </div>
       <div class="card"><h4>最近推送</h4><div id="whLog"><div class="hint">暂无记录</div></div></div>
@@ -275,9 +279,15 @@ function questionRow(q, idx) {
   const titleInp = document.createElement('input');
   titleInp.type = 'text'; titleInp.placeholder = '题目内容'; titleInp.value = q.title || '';
   titleInp.className = 't-flex';
+  const up = document.createElement('button');
+  up.className = 'btn small'; up.title = '上移'; up.textContent = '↑';
+  up.onclick = () => { moveQuestion(idx, -1); };
+  const dn = document.createElement('button');
+  dn.className = 'btn small'; dn.title = '下移'; dn.textContent = '↓';
+  dn.onclick = () => { moveQuestion(idx, 1); };
   const del = document.createElement('button');
   del.className = 'btn danger small'; del.textContent = '删除';
-  head.appendChild(idxEl); head.appendChild(sel); head.appendChild(titleInp); head.appendChild(del);
+  head.appendChild(idxEl); head.appendChild(sel); head.appendChild(titleInp); head.appendChild(up); head.appendChild(dn); head.appendChild(del);
   div.appendChild(head);
 
   const required = document.createElement('div');
@@ -299,10 +309,16 @@ function questionRow(q, idx) {
       const inp = document.createElement('input');
       inp.type = 'text'; inp.placeholder = '选项 ' + (oi + 1); inp.value = opt || '';
       inp.oninput = () => { q.options[oi] = inp.value; };
+      const up = document.createElement('button');
+      up.className = 'opt-move'; up.title = '上移'; up.textContent = '↑';
+      up.onclick = () => { moveOption(q, oi, -1); };
+      const dn = document.createElement('button');
+      dn.className = 'opt-move'; dn.title = '下移'; dn.textContent = '↓';
+      dn.onclick = () => { moveOption(q, oi, 1); };
       const rm = document.createElement('button');
       rm.className = 'opt-del'; rm.textContent = '×';
       rm.onclick = () => { q.options.splice(oi, 1); renderOptions(); };
-      r.appendChild(inp); r.appendChild(rm);
+      r.appendChild(inp); r.appendChild(up); r.appendChild(dn); r.appendChild(rm);
       optionsWrap.appendChild(r);
     });
     const add = document.createElement('button');
@@ -339,6 +355,20 @@ function questionRow(q, idx) {
   div.appendChild(optionsWrap);
   div.appendChild(ratingWrap);
   return div;
+}
+
+function moveQuestion(idx, dir) {
+  const t = idx + dir;
+  if (t < 0 || t >= draft.length) return;
+  const tmp = draft[idx]; draft[idx] = draft[t]; draft[t] = tmp;
+  renderQuestions();
+}
+
+function moveOption(q, oi, dir) {
+  const t = oi + dir;
+  if (t < 0 || t >= q.options.length) return;
+  const tmp = q.options[oi]; q.options[oi] = q.options[t]; q.options[t] = tmp;
+  renderQuestions();
 }
 
 function renderQuestions() {
@@ -485,6 +515,24 @@ function whTagRow(k, v) {
   return row;
 }
 
+function renderPresets() {
+  const box = $('#whPresets');
+  box.innerHTML = '<span class="hint" style="margin:0 4px 0 0">常用：</span>';
+  ['来源', '渠道', '批次', '活动', '平台'].forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'btn small';
+    b.textContent = p;
+    b.title = '添加标记：' + p;
+    b.onclick = () => {
+      $('#whTags').appendChild(whTagRow(p, ''));
+      b.disabled = true;
+      b.style.opacity = '.5';
+      b.textContent = '已添加';
+    };
+    box.appendChild(b);
+  });
+}
+
 function renderWhLog(log) {
   const box = $('#whLog');
   box.innerHTML = '';
@@ -501,6 +549,7 @@ function renderWhLog(log) {
 
 async function openWebhook() {
   switchTab('webhook');
+  renderPresets();
   try {
     const d = await api('/api/admin/webhook');
     const c = d.config || {};
@@ -601,6 +650,16 @@ document.querySelectorAll('.tabs button').forEach(b => {
 });
 $('#addTagBtn').onclick = () => { $('#whTags').appendChild(whTagRow('', '')); };
 $('#whSaveBtn').onclick = saveWebhook;
+
+// Ctrl+S / Cmd+S 快捷保存（编辑问卷时）
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    if (!$('#app').hidden && !$('#tab-editor').hidden) {
+      e.preventDefault();
+      saveSurvey();
+    }
+  }
+});
 
 // 列表项操作：设为分享 / 删除
 window._share = async (id) => { try { await shareSurvey(id); } catch (e) { toast(e.message, true); } };
