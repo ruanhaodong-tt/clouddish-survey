@@ -19,7 +19,7 @@ const q = storage.createQuestionnaire({
   ]
 });
 
-const server = new SurveyServer(storage);
+const server = new SurveyServer(storage, { adminToken: 'test-token' });
 
 function req(method, p, body) {
   return new Promise((resolve, reject) => {
@@ -136,9 +136,63 @@ function req(method, p, body) {
     console.log('[16] webhook log last =', JSON.stringify(last));
     if (!last || last.ok !== true) throw new Error('webhook log not ok');
 
+    // 管理 API
+    const areq = (method, p, body) => new Promise((resolve, reject) => {
+      const data = body ? JSON.stringify(body) : null;
+      const r = http.request({
+        host: '127.0.0.1', port: 8899, path: p, method,
+        headers: Object.assign({ 'Authorization': 'Bearer test-token' }, data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {})
+      }, res => {
+        let b = '';
+        res.on('data', c => b += c);
+        res.on('end', () => resolve({ status: res.statusCode, body: b }));
+      });
+      r.on('error', reject);
+      if (data) r.write(data);
+      r.end();
+    });
+
+    const noAuth = await req('GET', '/api/admin/surveys');
+    console.log('[17] admin no token ->', noAuth.status);
+    if (noAuth.status !== 401) throw new Error('admin should 401 without token');
+
+    const c1 = await areq('POST', '/api/admin/survey', { title: '管理页建的问卷', questions: [{ type: 'single', title: '测试', options: ['是', '否'] }] });
+    const c1j = JSON.parse(c1.body);
+    console.log('[18] admin create ->', c1.status, 'id=', c1j.id);
+    if (!c1j.id) throw new Error('create survey failed');
+
+    const l1 = await areq('GET', '/api/admin/surveys');
+    const l1j = JSON.parse(l1.body);
+    console.log('[19] admin list ->', l1.status, 'count=', l1j.surveys.length);
+    if (!l1j.surveys.some(s => s.id === c1j.id)) throw new Error('created survey not in list');
+
+    const up = await areq('POST', '/api/admin/survey', { id: c1j.id, title: '改名问卷', setShared: false, questions: [{ type: 'text', title: '意见' }] });
+    console.log('[20] admin update ->', up.status);
+    if (up.status !== 200) throw new Error('update failed');
+
+    const sh = await areq('POST', '/api/admin/share', { id: c1j.id });
+    console.log('[21] admin share ->', sh.status);
+    const h2 = await req('GET', '/health');
+    console.log('[22] health after share ->', JSON.parse(h2.body).survey);
+    if (JSON.parse(h2.body).survey !== '改名问卷') throw new Error('share not applied');
+
+    const wh1 = await areq('GET', '/api/admin/webhook');
+    console.log('[23] admin webhook get ->', wh1.status);
+    const wh2 = await areq('POST', '/api/admin/webhook', { enabled: true, url: 'http://127.0.0.1:8898/hook', fields: ['answers', 'meta'], tags: { src: 'admin-test' } });
+    console.log('[24] admin webhook set ->', wh2.status, JSON.parse(wh2.body).config.enabled);
+
+    const del = await areq('DELETE', '/api/admin/survey?id=' + c1j.id);
+    console.log('[25] admin delete ->', del.status);
+    const l2 = await areq('GET', '/api/admin/surveys');
+    if (JSON.parse(l2.body).surveys.some(s => s.id === c1j.id)) throw new Error('delete failed');
+
+    const adminPage = await req('GET', '/admin');
+    console.log('[26] GET /admin ->', adminPage.status, 'len=', adminPage.body.length);
+    if (adminPage.body.indexOf('云问卷') < 0) throw new Error('admin page missing');
+
     await server.stop();
     hook.close();
-    console.log('[17] server stopped, running =', server.isRunning());
+    console.log('[27] server stopped, running =', server.isRunning());
     console.log('ALL SMOKE TESTS PASSED');
   } catch (e) {
     console.error('SMOKE TEST FAILED:', e);

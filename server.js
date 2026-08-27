@@ -85,8 +85,9 @@ function readableAnswers(survey, response) {
 }
 
 class SurveyServer {
-  constructor(storage) {
+  constructor(storage, options) {
     this.storage = storage;
+    this.adminToken = (options && options.adminToken) || '';
     this.server = null;
     this.port = storage.getSettings().port;
   }
@@ -158,6 +159,13 @@ class SurveyServer {
 
   _clientIp(req) {
     return String((req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
+  }
+
+  _authOk(req) {
+    if (!this.adminToken) return false;
+    const h = String(req.headers['authorization'] || '');
+    const x = String(req.headers['x-admin-token'] || '');
+    return h === 'Bearer ' + this.adminToken || x === this.adminToken;
   }
 
   _pushWebhook(survey, response, total, from) {
@@ -263,6 +271,88 @@ class SurveyServer {
       if (!survey) return this._send(res, 404, { error: '问卷不存在或尚未分享' });
       const stats = computeStats(survey, this.storage.getResponses(survey.id));
       return this._send(res, 200, Object.assign({ ok: true }, stats));
+    }
+
+    // ---- 内置管理页与管理 API（写操作需 admin token）----
+    if (req.method === 'GET' && pathname === '/admin') {
+      try {
+        const html = fs.readFileSync(path.join(__dirname, 'admin-page.html'), 'utf8');
+        return this._send(res, 200, html, true);
+      } catch (e) {
+        return this._send(res, 500, { error: '管理页文件缺失: admin-page.html' });
+      }
+    }
+
+    if (pathname.startsWith('/api/admin/')) {
+      if (!this._authOk(req)) return this._send(res, 401, { error: '未授权：缺少或错误的 admin token' });
+
+      if (req.method === 'GET' && pathname === '/api/admin/surveys') {
+        const sid = this.storage.getSettings().sharedId;
+        return this._send(res, 200, {
+          ok: true,
+          sharedId: sid,
+          surveys: this.storage.listQuestionnaires().map(q => ({
+            id: q.id, title: q.title, createdAt: q.createdAt, count: this.storage.countResponses(q.id)
+          }))
+        });
+      }
+
+      if (req.method === 'GET' && pathname === '/api/admin/survey') {
+        const id = url.searchParams.get('id');
+        const q = id ? this.storage.getQuestionnaire(id) : null;
+        if (!q) return this._send(res, 404, { error: '问卷不存在' });
+        return this._send(res, 200, { ok: true, survey: q });
+      }
+
+      if (req.method === 'GET' && pathname === '/api/admin/webhook') {
+        return this._send(res, 200, Object.assign({ ok: true }, this.storage.getWebhook()));
+      }
+
+      if (req.method === 'DELETE' && pathname === '/api/admin/survey') {
+        const id = url.searchParams.get('id');
+        if (!id) return this._send(res, 400, { error: '缺少 id 参数' });
+        this.storage.deleteQuestionnaire(id);
+        return this._send(res, 200, { ok: true });
+      }
+
+      if (req.method === 'POST' && ['/api/admin/survey', '/api/admin/share', '/api/admin/webhook'].includes(pathname)) {
+        let body = '';
+        let size = 0;
+        req.on('data', (chunk) => { size += chunk.length; if (size > 1048576) req.destroy(); else body += chunk; });
+        req.on('end', () => {
+          let payload;
+          try { payload = JSON.parse(body || '{}'); } catch (e) { return this._send(res, 400, { error: '请求格式错误' }); }
+
+          if (pathname === '/api/admin/survey') {
+            const id = payload.id;
+            if (id) {
+              const q = this.storage.updateQuestionnaire(id, payload);
+              if (!q) return this._send(res, 404, { error: '问卷不存在' });
+              if (payload.setShared !== false) this.storage.setShared(q.id);
+              return this._send(res, 200, { ok: true, id: q.id });
+            }
+            const q = this.storage.createQuestionnaire(payload);
+            if (payload.setShared !== false) this.storage.setShared(q.id);
+            return this._send(res, 200, { ok: true, id: q.id });
+          }
+
+          if (pathname === '/api/admin/share') {
+            const id = payload.id;
+            const q = this.storage.getQuestionnaire(id);
+            if (!q) return this._send(res, 404, { error: '问卷不存在' });
+            this.storage.setShared(id);
+            return this._send(res, 200, { ok: true, id });
+          }
+
+          if (pathname === '/api/admin/webhook') {
+            const saved = this.storage.setWebhook(payload);
+            return this._send(res, 200, { ok: true, config: saved });
+          }
+        });
+        return;
+      }
+
+      return this._send(res, 404, { error: '管理接口不存在' });
     }
 
     if (req.method === 'GET' && pathname === '/health') {

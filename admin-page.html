@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>云问卷 · 管理</title>
+<style>
+:root {
+  --primary: #2563eb; --primary-d: #1d4ed8;
+  --bg: #f5f7fb; --panel: #fff; --line: #e2e8f0;
+  --text: #1e293b; --muted: #64748b; --danger: #dc2626; --green: #16a34a;
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+.brand { font-size: 17px; font-weight: 700; }
+.brand small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 8px; }
+.token-row { display: flex; gap: 8px; align-items: center; }
+.token-row input { width: 240px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; outline: none; }
+.token-row input:focus { border-color: var(--primary); }
+.center-card { max-width: 420px; margin: 80px auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; text-align: center; }
+.center-card h3 { margin-bottom: 10px; }
+.center-card p { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+.center-card code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+.center-card input { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; outline: none; }
+.center-card input:focus { border-color: var(--primary); }
+#app { display: flex; min-height: calc(100vh - 52px); }
+aside { width: 260px; flex: none; border-right: 1px solid var(--line); background: var(--panel); padding: 14px; }
+aside .btn { width: 100%; margin-bottom: 10px; }
+#surveyList { list-style: none; }
+#surveyList li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: .12s; }
+#surveyList li:hover { border-color: var(--primary); }
+#surveyList li.active { border-color: var(--primary); background: #eff6ff; }
+#surveyList .t { font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+#surveyList .tag { font-size: 11px; color: var(--primary); background: #eff6ff; padding: 1px 7px; border-radius: 10px; }
+#surveyList .meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+main { flex: 1; padding: 20px; min-width: 0; }
+.tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.tabs button { padding: 7px 14px; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; cursor: pointer; }
+.tabs button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+.card h4 { margin-bottom: 12px; font-size: 15px; }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+input[type=text], input[type=number], select { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; outline: none; font-size: 13px; }
+input:focus, select:focus { border-color: var(--primary); }
+.row { display: flex; gap: 10px; margin-bottom: 10px; }
+.row > div { flex: 1; }
+.btn { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--primary); color: var(--primary); }
+.btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn.primary:hover { background: var(--primary-d); color: #fff; }
+.btn.danger { color: var(--danger); border-color: #fecaca; }
+.btn.danger:hover { background: #fef2f2; }
+.btn.small { padding: 4px 9px; font-size: 12px; }
+.btn.block { display: block; width: 100%; }
+.q-card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #fafbfd; }
+.q-head { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.q-head .idx { color: var(--muted); font-size: 12px; width: 22px; }
+.q-head select { width: 120px; flex: none; }
+.q-head .t-flex { flex: 1; }
+.opt-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+.opt-row input { flex: 1; }
+.opt-del { border: none; background: none; color: var(--danger); cursor: pointer; font-size: 15px; padding: 0 4px; }
+.opt-add, .q-add { margin-top: 4px; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); }
+.check input { width: auto; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.stat-opt { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.bar { height: 8px; background: #dbeafe; border-radius: 4px; flex: 1; max-width: 300px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--primary); border-radius: 4px; }
+.wh-fields { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 10px; }
+.wh-fields label { display: flex; align-items: center; gap: 5px; margin: 0; color: var(--text); }
+.wh-log-item { display: flex; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.ok { color: var(--green); } .fail { color: var(--danger); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+.tip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">云问卷 <small>服务端管理</small></div>
+  <div class="token-row">
+    <input id="token" type="password" placeholder="admin token">
+    <button id="tokenBtn" class="btn primary">连接</button>
+  </div>
+</header>
+
+<div id="login" class="center-card">
+  <h3>需要管理员 token</h3>
+  <p>在服务器启动日志中找到 <code>admin token: csxxx</code> 填入即可；也可用 <code>SURVEY_ADMIN_TOKEN</code> 固定设置。</p>
+  <input id="tokenLogin" type="password" placeholder="请输入 admin token">
+  <button id="loginBtn" class="btn primary block">进入管理</button>
+</div>
+
+<div id="app" hidden>
+  <aside>
+    <button id="newBtn" class="btn primary">+ 新建问卷</button>
+    <ul id="surveyList"></ul>
+  </aside>
+  <main>
+    <div id="editorTip" class="tip">分享链接即答题页地址 <code>http://服务器IP:端口/</code>，保存问卷后自动作为当前分享问卷。</div>
+    <div class="tabs">
+      <button data-tab="editor" class="active">编辑问卷</button>
+      <button data-tab="stats">统计</button>
+      <button data-tab="responses">答卷</button>
+      <button data-tab="webhook">推送</button>
+    </div>
+
+    <section id="tab-editor">
+      <div class="card">
+        <div class="row">
+          <div><label>问卷标题</label><input type="text" id="edTitle" placeholder="问卷标题"></div>
+        </div>
+        <div class="row">
+          <div><label>问卷说明（可留空）</label><input type="text" id="edDesc" placeholder="问卷说明"></div>
+        </div>
+      </div>
+      <div id="edQuestions"></div>
+      <button id="addQBtn" class="btn">+ 添加题目</button>
+      <button id="saveBtn" class="btn primary" style="margin-left:8px">保存问卷</button>
+    </section>
+
+    <section id="tab-stats" hidden><div id="statsBox"></div></section>
+    <section id="tab-responses" hidden><div id="respBox"></div></section>
+    <section id="tab-webhook" hidden>
+      <div class="card">
+        <div class="check" style="margin-bottom:12px"><input type="checkbox" id="whEnabled"><label style="margin:0">启用新答卷推送</label></div>
+        <label>接口地址</label>
+        <input type="text" id="whUrl" placeholder="http://你的后端:端口/hook" style="margin-bottom:12px">
+        <label>推送内容（可多选）</label>
+        <div class="wh-fields">
+          <label><input type="checkbox" data-field="survey"> 问卷信息</label>
+          <label><input type="checkbox" data-field="answers"> 答卷答案</label>
+          <label><input type="checkbox" data-field="stats"> 统计数据</label>
+          <label><input type="checkbox" data-field="meta"> 元信息</label>
+        </div>
+        <label>自定义标记</label>
+        <div id="whTags"></div>
+        <button id="addTagBtn" class="btn small" style="margin:6px 0 12px">+ 添加标记</button>
+        <button id="whSaveBtn" class="btn primary">保存推送配置</button>
+      </div>
+      <div class="card"><h4>最近推送</h4><div id="whLog"><div class="hint">暂无记录</div></div></div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const TYPE_LABEL = { single: '单选', multiple: '多选', text: '填空', rating: '评分' };
+
+let token = localStorage.getItem('cs_admin_token') || '';
+let surveys = [];
+let sharedId = null;
+let curId = null;
+let draft = [];          // 编辑中的题目数组
+
+function toast(msg, err) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.style.background = err ? 'var(--danger)' : '#111827';
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+async function api(path, opts) {
+  const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+  const res = await fetch(path, Object.assign({ headers }, opts));
+  if (res.status === 401) { showLogin('token 已失效，请重新输入'); throw new Error('unauthorized'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
+function showLogin(msg) {
+  $('#login').hidden = false;
+  $('#app').hidden = true;
+  if (msg) $('#login p').textContent = msg;
+}
+
+async function loadAll() {
+  const d = await api('/api/admin/surveys');
+  surveys = d.surveys;
+  sharedId = d.sharedId;
+  renderList();
+  if (curId && surveys.some(s => s.id === curId)) return;
+  const target = sharedId || (surveys[0] && surveys[0].id);
+  if (target) openSurvey(target);
+}
+
+function renderList() {
+  const ul = $('#surveyList');
+  ul.innerHTML = '';
+  if (!surveys.length) {
+    const li = document.createElement('li');
+    li.style.color = 'var(--muted)'; li.style.cursor = 'default';
+    li.textContent = '还没有问卷';
+    ul.appendChild(li);
+    return;
+  }
+  surveys.forEach(s => {
+    const li = document.createElement('li');
+    li.className = s.id === curId ? 'active' : '';
+    const t = document.createElement('div');
+    t.className = 't';
+    const name = document.createElement('span');
+    name.textContent = s.title;
+    t.appendChild(name);
+    if (s.id === sharedId) {
+      const tag = document.createElement('span');
+      tag.className = 'tag'; tag.textContent = '分享中';
+      t.appendChild(tag);
+    }
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = s.count + ' 份答卷';
+    li.appendChild(t);
+    li.appendChild(meta);
+    const actions = document.createElement('div');
+    actions.style.display = 'flex'; actions.style.gap = '6px'; actions.style.marginTop = '7px';
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'btn small';
+    shareBtn.textContent = s.id === sharedId ? '分享中' : '设为分享';
+    shareBtn.onclick = (e) => { e.stopPropagation(); window._share(s.id); };
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn small danger';
+    delBtn.textContent = '删除';
+    delBtn.onclick = (e) => { e.stopPropagation(); window._del(s.id); };
+    actions.appendChild(shareBtn); actions.appendChild(delBtn);
+    li.appendChild(actions);
+    li.onclick = () => openSurvey(s.id);
+    ul.appendChild(li);
+  });
+}
+
+async function openSurvey(id) {
+  curId = id;
+  renderList();
+  const d = await api('/api/admin/survey?id=' + encodeURIComponent(id));
+  $('#edTitle').value = d.survey.title || '';
+  $('#edDesc').value = d.survey.description || '';
+  draft = (d.survey.questions || []).map(q => ({
+    type: q.type, title: q.title, required: !!q.required,
+    options: (q.options || []).slice(), ratingMax: q.ratingMax || 5
+  }));
+  if (!draft.length) addQuestion();
+  renderQuestions();
+}
+
+function questionRow(q, idx) {
+  const div = document.createElement('div');
+  div.className = 'q-card';
+  const head = document.createElement('div');
+  head.className = 'q-head';
+  const idxEl = document.createElement('span');
+  idxEl.className = 'idx'; idxEl.textContent = (idx + 1) + '.';
+  const sel = document.createElement('select');
+  ['single', 'multiple', 'text', 'rating'].forEach(tp => {
+    const o = document.createElement('option');
+    o.value = tp; o.textContent = TYPE_LABEL[tp];
+    if (tp === q.type) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.style.width = '110px';
+  const titleInp = document.createElement('input');
+  titleInp.type = 'text'; titleInp.placeholder = '题目内容'; titleInp.value = q.title || '';
+  titleInp.className = 't-flex';
+  const del = document.createElement('button');
+  del.className = 'btn danger small'; del.textContent = '删除';
+  head.appendChild(idxEl); head.appendChild(sel); head.appendChild(titleInp); head.appendChild(del);
+  div.appendChild(head);
+
+  const required = document.createElement('div');
+  required.className = 'check';
+  required.innerHTML = '<input type="checkbox" id="req' + idx + '"><label for="req' + idx + '">必答</label>';
+  required.querySelector('input').checked = !!q.required;
+  div.appendChild(required);
+
+  const optionsWrap = document.createElement('div');
+  const ratingWrap = document.createElement('div');
+  optionsWrap.hidden = !(q.type === 'single' || q.type === 'multiple');
+  ratingWrap.hidden = q.type !== 'rating';
+
+  function renderOptions() {
+    optionsWrap.innerHTML = '';
+    (q.options.length ? q.options : ['']).forEach((opt, oi) => {
+      const r = document.createElement('div');
+      r.className = 'opt-row';
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.placeholder = '选项 ' + (oi + 1); inp.value = opt || '';
+      inp.oninput = () => { q.options[oi] = inp.value; };
+      const rm = document.createElement('button');
+      rm.className = 'opt-del'; rm.textContent = '×';
+      rm.onclick = () => { q.options.splice(oi, 1); renderOptions(); };
+      r.appendChild(inp); r.appendChild(rm);
+      optionsWrap.appendChild(r);
+    });
+    const add = document.createElement('button');
+    add.className = 'btn small opt-add'; add.textContent = '+ 添加选项';
+    add.onclick = () => { q.options.push(''); renderOptions(); };
+    optionsWrap.appendChild(add);
+  }
+  renderOptions();
+
+  const rating = document.createElement('div');
+  rating.style.display = 'flex'; rating.style.alignItems = 'center'; rating.style.gap = '8px';
+  rating.innerHTML = '<label style="margin:0">评分上限</label>';
+  const rSel = document.createElement('select');
+  rSel.style.width = '90px';
+  for (let i = 2; i <= 10; i++) {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = i + ' 分';
+    if (i === (q.ratingMax || 5)) o.selected = true;
+    rSel.appendChild(o);
+  }
+  rSel.onchange = () => { q.ratingMax = Number(rSel.value); };
+  rating.appendChild(rSel);
+  ratingWrap.appendChild(rating);
+
+  sel.onchange = () => {
+    q.type = sel.value;
+    optionsWrap.hidden = !(q.type === 'single' || q.type === 'multiple');
+    ratingWrap.hidden = q.type !== 'rating';
+  };
+  titleInp.oninput = () => { q.title = titleInp.value; };
+  required.querySelector('input').onchange = () => { q.required = required.querySelector('input').checked; };
+  del.onclick = () => { draft.splice(idx, 1); renderQuestions(); };
+
+  div.appendChild(optionsWrap);
+  div.appendChild(ratingWrap);
+  return div;
+}
+
+function renderQuestions() {
+  const box = $('#edQuestions');
+  box.innerHTML = '';
+  draft.forEach((q, i) => box.appendChild(questionRow(q, i)));
+}
+
+function addQuestion() {
+  draft.push({ type: 'single', title: '', required: false, options: ['', ''], ratingMax: 5 });
+  renderQuestions();
+}
+
+async function saveSurvey() {
+  if (!curId) return toast('请先选择或新建问卷', true);
+  const payload = {
+    id: curId,
+    title: $('#edTitle').value,
+    description: $('#edDesc').value,
+    questions: draft.map(q => ({
+      type: q.type, title: q.title.trim(), required: q.required,
+      options: (q.options || []).map(o => String(o || '').trim()).filter(Boolean),
+      ratingMax: q.ratingMax
+    })).filter(q => q.title)
+  };
+  if (!payload.questions.length) return toast('至少需要一个题目', true);
+  const d = await api('/api/admin/survey', { method: 'POST', body: JSON.stringify(payload) });
+  toast('已保存并设为当前分享问卷');
+  await loadAll();
+}
+
+async function deleteSurvey(id) {
+  if (!confirm('确定删除该问卷及其全部答卷？')) return;
+  await api('/api/admin/survey?id=' + encodeURIComponent(id), { method: 'DELETE' });
+  if (curId === id) { curId = null; draft = []; $('#edTitle').value = ''; $('#edDesc').value = ''; renderQuestions(); }
+  toast('已删除');
+  await loadAll();
+}
+
+async function shareSurvey(id) {
+  await api('/api/admin/share', { method: 'POST', body: JSON.stringify({ id }) });
+  sharedId = id;
+  toast('已设为当前分享问卷');
+  renderList();
+  openStats();
+}
+
+/* ---------------- 统计 ---------------- */
+async function openStats() {
+  switchTab('stats');
+  const box = $('#statsBox');
+  try {
+    const st = await api('/api/stats');
+    let html = '<div class="card"><h4>共 ' + st.total + ' 份答卷</h4></div>';
+    st.byQuestion && Object.keys(st.byQuestion).forEach(k => {
+      const q = st.byQuestion[k];
+      if (q.type === 'text') {
+        html += '<div class="card"><h4>' + esc(q.title) + '（填空）</h4>';
+        if (!q.texts.length) html += '<div class="hint">暂无回答</div>';
+        else q.texts.forEach(t => { html += '<div style="margin-bottom:4px">· ' + esc(t) + '</div>'; });
+        html += '</div>';
+      } else if (q.type === 'rating') {
+        html += '<div class="card"><h4>' + esc(q.title) + '（评分） 平均 ' + q.average + ' / ' + q.ratingMax + '</h4>';
+        Object.keys(q.distribution).forEach(v => {
+          const c = q.distribution[v];
+          const pct = st.total ? Math.round(c / st.total * 100) : 0;
+          html += '<div class="stat-opt"><span style="width:30px">' + v + '分</span><div class="bar"><i style="width:' + pct + '%"></i></div><span>' + c + '</span></div>';
+        });
+        html += '</div>';
+      } else {
+        html += '<div class="card"><h4>' + esc(q.title) + '（' + TYPE_LABEL[q.type] + '）</h4>';
+        q.options.forEach(o => {
+          const pct = st.total ? Math.round(o.count / st.total * 100) : 0;
+          html += '<div class="stat-opt"><span style="width:110px">' + esc(o.option) + '</span><div class="bar"><i style="width:' + pct + '%"></i></div><span>' + o.count + ' (' + pct + '%)</span></div>';
+        });
+        html += '</div>';
+      }
+    });
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div class="card hint">' + esc(e.message) + '</div>';
+  }
+}
+
+/* ---------------- 答卷 ---------------- */
+async function openResponses() {
+  switchTab('responses');
+  const box = $('#respBox');
+  try {
+    const d = await api('/api/responses');
+    if (!d.responses || !d.responses.length) {
+      box.innerHTML = '<div class="card hint">还没有答卷</div>';
+      return;
+    }
+    const survey = (await api('/api/survey')).survey;
+    let html = '<div class="card"><h4>共 ' + d.total + ' 份答卷</h4>';
+    html += '<table><thead><tr><th>提交时间</th>';
+    survey.questions.forEach(q => { html += '<th>' + esc(q.title) + '</th>'; });
+    html += '</tr></thead><tbody>';
+    d.responses.forEach(r => {
+      html += '<tr><td>' + esc(new Date(r.submittedAt).toLocaleString('zh-CN')) + '</td>';
+      survey.questions.forEach(q => {
+        const v = r.answers[q.id];
+        let show = '';
+        if (Array.isArray(v)) show = v.map(x => esc(q.options[Number(x) - 1] || x)).join('、');
+        else if (v != null && v !== '') show = q.type === 'single' ? esc(q.options[Number(v) - 1] || v) : esc(v);
+        html += '<td>' + (show || '<span class="hint">-</span>') + '</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = '<div class="card hint">' + esc(e.message) + '</div>';
+  }
+}
+
+/* ---------------- webhook ---------------- */
+function whTagRow(k, v) {
+  const row = document.createElement('div');
+  row.className = 'opt-row';
+  const kInp = document.createElement('input');
+  kInp.placeholder = '标记名'; kInp.value = k || '';
+  const vInp = document.createElement('input');
+  vInp.placeholder = '值'; vInp.value = v || '';
+  const rm = document.createElement('button');
+  rm.className = 'opt-del'; rm.textContent = '×';
+  rm.onclick = () => row.remove();
+  row.appendChild(kInp); row.appendChild(vInp); row.appendChild(rm);
+  return row;
+}
+
+function renderWhLog(log) {
+  const box = $('#whLog');
+  box.innerHTML = '';
+  if (!log || !log.length) { box.innerHTML = '<div class="hint">暂无记录</div>'; return; }
+  log.slice(-5).reverse().forEach(e => {
+    const d = document.createElement('div');
+    d.className = 'wh-log-item';
+    const detail = e.ok ? ('HTTP ' + e.code) : (e.error || 'HTTP ' + e.code);
+    d.innerHTML = (e.ok ? '<span class="ok">成功</span>' : '<span class="fail">失败</span>') +
+      '<span>' + esc(detail) + '</span><span>' + esc(new Date(e.time).toLocaleString('zh-CN')) + '</span>';
+    box.appendChild(d);
+  });
+}
+
+async function openWebhook() {
+  switchTab('webhook');
+  try {
+    const d = await api('/api/admin/webhook');
+    const c = d.config || {};
+    $('#whEnabled').checked = !!c.enabled;
+    $('#whUrl').value = c.url || '';
+    const fields = c.fields && c.fields.length ? c.fields : ['survey', 'answers', 'stats', 'meta'];
+    document.querySelectorAll('#tab-webhook input[data-field]').forEach(cb => {
+      cb.checked = fields.indexOf(cb.dataset.field) >= 0;
+    });
+    const tagsBox = $('#whTags');
+    tagsBox.innerHTML = '';
+    const tags = c.tags || {};
+    const keys = Object.keys(tags);
+    if (!keys.length) tagsBox.appendChild(whTagRow('', ''));
+    keys.forEach(k => tagsBox.appendChild(whTagRow(k, tags[k])));
+    renderWhLog(d.log);
+  } catch (e) { toast(e.message, true); }
+}
+
+async function saveWebhook() {
+  const fields = [];
+  document.querySelectorAll('#tab-webhook input[data-field]').forEach(cb => { if (cb.checked) fields.push(cb.dataset.field); });
+  const tags = {};
+  document.querySelectorAll('#whTags .opt-row').forEach(row => {
+    const k = row.querySelector('input').value.trim();
+    const v = row.querySelectorAll('input')[1].value;
+    if (k) tags[k] = v;
+  });
+  const d = await api('/api/admin/webhook', {
+    method: 'POST',
+    body: JSON.stringify({ enabled: $('#whEnabled').checked, url: $('#whUrl').value.trim(), fields, tags })
+  });
+  toast(d.config.enabled && d.config.url ? '推送配置已保存并启用' : '推送配置已保存');
+  openWebhook();
+}
+
+/* ---------------- 连接与切换 ---------------- */
+function setToken(t) {
+  token = t;
+  localStorage.setItem('cs_admin_token', t);
+  $('#token').value = t;
+}
+
+async function connect() {
+  const t = $('#token').value.trim();
+  if (!t) return toast('请输入 admin token', true);
+  setToken(t);
+  try {
+    await loadAll();
+    $('#login').hidden = true;
+    $('#app').hidden = false;
+    switchTab('editor');
+    toast('已连接');
+  } catch (e) { /* 401 已由 api 处理 */ }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  ['editor', 'stats', 'responses', 'webhook'].forEach(n => {
+    $('#tab-' + n).hidden = n !== name;
+  });
+}
+
+/* ---------------- 事件 ---------------- */
+$('#loginBtn').onclick = connect;
+$('#tokenBtn').onclick = connect;
+$('#token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+$('#tokenLogin').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+
+$('#newBtn').onclick = async () => {
+  const d = await api('/api/admin/survey', { method: 'POST', body: JSON.stringify({ title: '未命名问卷', description: '', questions: [{ type: 'single', title: '新题目', required: false, options: ['选项1', '选项2'], ratingMax: 5 }] }) });
+  await loadAll();
+  openSurvey(d.id);
+  switchTab('editor');
+  toast('已创建新问卷');
+};
+$('#addQBtn').onclick = addQuestion;
+$('#saveBtn').onclick = saveSurvey;
+document.querySelectorAll('.tabs button').forEach(b => {
+  b.onclick = () => {
+    const name = b.dataset.tab;
+    if (name === 'stats') openStats();
+    else if (name === 'responses') openResponses();
+    else if (name === 'webhook') openWebhook();
+    else switchTab('editor');
+  };
+});
+$('#addTagBtn').onclick = () => { $('#whTags').appendChild(whTagRow('', '')); };
+$('#whSaveBtn').onclick = saveWebhook;
+
+// 列表项操作：设为分享 / 删除
+window._share = async (id) => { try { await shareSurvey(id); } catch (e) { toast(e.message, true); } };
+window._del = async (id) => { try { await deleteSurvey(id); } catch (e) { toast(e.message, true); } };
+
+// 初始化
+(async () => {
+  if (token) {
+    try {
+      await loadAll();
+      $('#login').hidden = true;
+      $('#app').hidden = false;
+      switchTab('editor');
+    } catch (e) { showLogin('token 已失效，请重新输入'); }
+  }
+})();
+</script>
+</body>
+</html>

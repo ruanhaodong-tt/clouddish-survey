@@ -10,12 +10,17 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const Storage = require('./storage');
 const SurveyServer = require('./server');
 
 const dataDir = process.env.SURVEY_DATA_DIR || path.join(os.homedir(), '.clouddish-survey-data');
 const port = parseInt(process.argv[2], 10) || 8686;
 const qFile = process.argv[3];
+
+// admin token：可用 SURVEY_ADMIN_TOKEN 固定；否则随机生成并打印
+const adminToken = process.env.SURVEY_ADMIN_TOKEN ||
+  ('cs' + crypto.randomBytes(9).toString('hex'));
 
 const storage = new Storage(dataDir);
 
@@ -53,13 +58,14 @@ const storage = new Storage(dataDir);
     console.log('webhook 推送已启用 ->', process.env.SURVEY_WEBHOOK_URL);
   }
 
-  const server = new SurveyServer(storage);
+  const server = new SurveyServer(storage, { adminToken });
   try {
     const st = await server.start(port);
     console.log('');
     console.log('问卷服务已启动');
-    console.log('  本地访问: http://127.0.0.1:' + st.port + '/');
-    console.log('  局域网/公网: http://<服务器IP>:' + st.port + '/');
+    console.log('  答题页: http://<服务器IP>:' + st.port + '/');
+    console.log('  管理页: http://<服务器IP>:' + st.port + '/admin');
+    console.log('  admin token: ' + adminToken + (process.env.SURVEY_ADMIN_TOKEN ? '' : '  (随机生成，下次启动会变化)'));
     console.log('  查询接口: /api/survey  /api/responses  /api/stats');
     console.log('  提交接口: POST /submit');
     console.log('  数据目录: ' + dataDir);

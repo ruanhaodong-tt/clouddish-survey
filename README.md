@@ -209,6 +209,23 @@ node examples/webhook-receiver.js   # 监听 3000 端口，实时打印推送的
 
 然后在管理端把接口地址填成 `http://127.0.0.1:3000` 并启用即可。
 
+### 内置管理页（无界面服务端）
+
+用 `server-standalone.js` 部署时，浏览器访问 **`http://服务器IP:端口/admin`** 即可打开管理页，可视化完成全部管理操作，无需手写 JSON：
+
+- **建问卷**：左侧「新建问卷」，添加单选/多选/填空/评分题目，可设必答、增删选项、调整评分上限
+- **编辑**：改标题/说明/题目，保存后自动成为当前分享问卷（答题页立即更新）
+- **统计与答卷**：按题查看计数、评分分布与平均分、文本答案，以及逐条答卷明细
+- **推送配置**：接口地址、推送内容勾选、自定义标记、推送状态日志
+
+管理页受 **admin token** 保护，写操作需携带 token（未授权返回 401）：
+
+- 启动时若设置了环境变量 `SURVEY_ADMIN_TOKEN`，则使用该值作为 token
+- 未设置时服务会自动生成一个随机 token 并打印在启动日志里（每次启动变化）
+- 打开 `/admin` 后填入 token 即可进入；token 会保存在浏览器本地，下次免输
+
+> 管理接口：`GET/POST /api/admin/surveys|survey|share|webhook`、`DELETE /api/admin/survey`，请求头携带 `Authorization: Bearer <token>`。所有管理接口在桌面版（Electron）中不启用。
+
 ## 说明
 
 - 采用 MIT 开源协议发布

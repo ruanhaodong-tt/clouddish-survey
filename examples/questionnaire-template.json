@@ -1,0 +1,29 @@
+{
+  "title": "我的问卷",
+  "description": "这里是问卷说明，可以留空",
+  "questions": [
+    {
+      "type": "single",
+      "title": "您的性别",
+      "required": true,
+      "options": ["男", "女"]
+    },
+    {
+      "type": "multiple",
+      "title": "您喜欢的水果（可多选）",
+      "required": false,
+      "options": ["苹果", "香蕉", "橙子", "葡萄"]
+    },
+    {
+      "type": "text",
+      "title": "您的建议",
+      "required": false
+    },
+    {
+      "type": "rating",
+      "title": "总体满意度",
+      "required": true,
+      "ratingMax": 5
+    }
+  ]
+}
