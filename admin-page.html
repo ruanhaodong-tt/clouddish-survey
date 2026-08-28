@@ -13,13 +13,11 @@
   --radius: 3px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 body { font-family: Georgia, "KaiTi", "STKaiti", "Songti SC", "SimSun", "Microsoft YaHei", serif; background: var(--bg); background-image: radial-gradient(rgba(120,105,80,.05) 1px, transparent 1px); background-size: 22px 22px; color: var(--text); font-size: 14px; }
 header { background: var(--panel); border-bottom: 1px solid var(--line); border-top: 3px solid var(--primary); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
 .brand { font-size: 17px; font-weight: 700; }
 .brand small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 8px; }
-.token-row { display: flex; gap: 8px; align-items: center; }
-.token-row input { width: 240px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 3px; outline: none; background: #fff; }
-.token-row input:focus { border-color: var(--primary); }
 .center-card { max-width: 420px; margin: 80px auto; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--primary); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 10px 40px rgba(60,45,20,.07); padding: 28px; text-align: center; }
 .center-card h3 { margin-bottom: 10px; }
 .center-card p { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
@@ -86,17 +84,15 @@ th { color: var(--muted); font-weight: 600; }
 </style>
 </head>
 <body>
-<header>
-  <div class="token-row" style="margin-left:auto">
-    <input id="token" type="password" placeholder="管理密码">
-    <button id="tokenBtn" class="btn primary">连接</button>
+<header id="topbar" hidden>
+  <div style="margin-left:auto">
     <button id="pwBtn" class="btn" hidden>修改密码</button>
   </div>
 </header>
 
 <div id="login" class="center-card">
   <h3>需要管理密码</h3>
-  <p>在服务器启动日志中找到 <code>管理密码: csxxx</code> 填入即可；也可用 <code>SURVEY_ADMIN_TOKEN</code> 固定设置。</p>
+  <p>管理密码可在服务器启动日志中查看（形如 <code>管理密码: csxxx</code>），或通过环境变量预置。</p>
   <input id="tokenLogin" type="password" placeholder="请输入管理密码">
   <button id="loginBtn" class="btn primary block">进入管理</button>
 </div>
@@ -180,15 +176,17 @@ function toast(msg, err) {
 async function api(path, opts) {
   const headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
   const res = await fetch(path, Object.assign({ headers }, opts));
-  if (res.status === 401) { showLogin('token 已失效，请重新输入'); throw new Error('unauthorized'); }
+  if (res.status === 401) { showLogin('密码已失效，请重新输入'); throw new Error('unauthorized'); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
   return data;
 }
 
 function showLogin(msg) {
+  $('#topbar').hidden = true;
   $('#login').hidden = false;
   $('#app').hidden = true;
+  $('#tokenLogin').focus();
   if (msg) $('#login p').textContent = msg;
 }
 
@@ -590,20 +588,20 @@ async function saveWebhook() {
 function setToken(t) {
   token = t;
   localStorage.setItem('cs_admin_token', t);
-  $('#token').value = t;
 }
 
 async function connect() {
-  const t = $('#token').value.trim();
-  if (!t) return toast('请输入 admin token', true);
+  const t = $('#tokenLogin').value.trim();
+  if (!t) return toast('请输入管理密码', true);
   setToken(t);
   try {
     await loadAll();
     $('#login').hidden = true;
     $('#app').hidden = false;
+    $('#topbar').hidden = false;
     $('#pwBtn').hidden = false;
     switchTab('editor');
-    toast('已连接');
+    toast('已登录');
   } catch (e) { /* 401 已由 api 处理 */ }
 }
 
@@ -617,7 +615,6 @@ function switchTab(name) {
 
 /* ---------------- 事件 ---------------- */
 $('#loginBtn').onclick = connect;
-$('#tokenBtn').onclick = connect;
 $('#pwBtn').onclick = async () => {
   const next = prompt('输入新的管理密码（至少 4 位）');
   if (!next) return;
@@ -627,7 +624,6 @@ $('#pwBtn').onclick = async () => {
     toast('密码已修改');
   } catch (e) { toast(e.message, true); }
 };
-$('#token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 $('#tokenLogin').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 
 $('#newBtn').onclick = async () => {
@@ -672,9 +668,10 @@ window._del = async (id) => { try { await deleteSurvey(id); } catch (e) { toast(
       await loadAll();
       $('#login').hidden = true;
       $('#app').hidden = false;
+      $('#topbar').hidden = false;
       $('#pwBtn').hidden = false;
       switchTab('editor');
-    } catch (e) { showLogin('token 已失效，请重新输入'); }
+    } catch (e) { showLogin('密码已失效，请重新输入'); }
   }
 })();
 </script>
