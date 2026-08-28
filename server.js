@@ -175,16 +175,39 @@ class SurveyServer {
 
     let payload;
     try {
-      const fields = Array.isArray(wh.fields) && wh.fields.length ? wh.fields : ['survey', 'answers', 'stats', 'meta'];
+      // 题目名 -> 本份答卷该题的值，供标记 {{题目名}} 引用
+      const answerByTitle = {};
+      survey.questions.forEach(c => {
+        const v = response.answers[c.id];
+        if (v == null || v === '') return;
+        if (Array.isArray(v)) answerByTitle[c.title] = v.map(x => c.options[Number(x) - 1]).filter(Boolean).join('、');
+        else if (c.type === 'single') answerByTitle[c.title] = c.options[Number(v) - 1] || v;
+        else if (c.type === 'rating') answerByTitle[c.title] = Number(v);
+        else answerByTitle[c.title] = v;
+      });
+
+      const fields = Array.isArray(wh.fields) && wh.fields.length ? wh.fields : ['answers', 'meta'];
       payload = { event: 'response_created' };
-      if (fields.includes('survey')) payload.survey = { id: survey.id, title: survey.title, description: survey.description, questions: survey.questions };
+      if (fields.includes('survey')) {
+        payload.survey = { id: survey.id, title: survey.title, description: survey.description };
+        if (survey.questions) payload.questions = survey.questions.map(c => ({ id: c.id, title: c.title, type: c.type }));
+      }
       if (fields.includes('answers')) payload.answers = readableAnswers(survey, response);
       if (fields.includes('stats')) payload.stats = computeStats(survey, this.storage.getResponses(survey.id));
       if (fields.includes('meta')) payload.meta = { submitId: response.id, submittedAt: response.submittedAt, total, from };
+
+      // 标记：{{题目名}} 会替换为本份答卷该题的作答
       const tags = wh.tags && typeof wh.tags === 'object' ? wh.tags : {};
       Object.keys(tags).forEach(k => {
-        const v = tags[k];
-        if (v !== '' && v != null) payload[k] = v;
+        let v = tags[k];
+        if (v === '' || v == null) return;
+        if (typeof v === 'string') {
+          v = v.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (m, t) => {
+            const key = t.trim();
+            return answerByTitle[key] != null ? String(answerByTitle[key]) : m;
+          });
+        }
+        payload[k] = v;
       });
     } catch (e) {
       this.storage.addWebhookLog({ ok: false, error: '构造推送数据失败: ' + String((e && e.message) || e).slice(0, 200) });

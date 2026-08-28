@@ -136,14 +136,14 @@ th { color: var(--muted); font-weight: 600; }
         <div class="check" style="margin-bottom:12px"><input type="checkbox" id="whEnabled"><label style="margin:0">启用新答卷推送</label></div>
         <label>接口地址</label>
         <input type="text" id="whUrl" placeholder="http://你的后端:端口/hook" style="margin-bottom:12px">
-        <label>推送内容（可多选）</label>
+        <label>推送内容（可多选，未勾选默认只推答案与元信息）</label>
         <div class="wh-fields">
           <label><input type="checkbox" data-field="survey"> 问卷信息</label>
-          <label><input type="checkbox" data-field="answers"> 答卷答案</label>
+          <label><input type="checkbox" data-field="answers" checked> 答卷答案</label>
           <label><input type="checkbox" data-field="stats"> 统计数据</label>
-          <label><input type="checkbox" data-field="meta"> 元信息</label>
+          <label><input type="checkbox" data-field="meta" checked> 元信息</label>
         </div>
-        <label>自定义标记（附加到推送数据，如区分来源/渠道）</label>
+        <label>自定义标记（值中可用 <code>{{题目名}}</code> 引用本份答卷该题的作答）</label>
         <div class="presets" id="whPresets"></div>
         <div id="whTags"></div>
         <button id="addTagBtn" class="btn small" style="margin:6px 0 12px">+ 自定义标记</button>
@@ -555,7 +555,7 @@ async function openWebhook() {
     const c = d.config || {};
     $('#whEnabled').checked = !!c.enabled;
     $('#whUrl').value = c.url || '';
-    const fields = c.fields && c.fields.length ? c.fields : ['survey', 'answers', 'stats', 'meta'];
+    const fields = c.fields && c.fields.length ? c.fields : ['answers', 'meta'];
     document.querySelectorAll('#tab-webhook input[data-field]').forEach(cb => {
       cb.checked = fields.indexOf(cb.dataset.field) >= 0;
     });
