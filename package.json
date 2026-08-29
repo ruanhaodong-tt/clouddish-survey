@@ -1,6 +1,6 @@
 {
   "name": "clouddish-survey",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "云问卷：本地HTTP服务端 + 端口传输的问卷收集与管理工具",
   "main": "main.js",
   "author": "一条大咸鱼",
@@ -37,8 +37,8 @@
     ],
     "win": {
       "target": [
-        { "target": "portable", "arch": ["x64"] },
-        { "target": "nsis", "arch": ["x64"] }
+        { "target": "portable", "arch": ["x64"], "artifactName": "CloudSurvey-${version}-win-portable.${ext}" },
+        { "target": "nsis", "arch": ["x64"], "artifactName": "CloudSurvey-${version}-win-setup.${ext}" }
       ],
       "icon": "assets/icon.png",
       "signAndEditExecutable": false
@@ -52,8 +52,8 @@
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        { "target": "AppImage", "arch": ["x64"], "artifactName": "CloudSurvey-${version}-linux-x64.${ext}" },
+        { "target": "deb", "arch": ["x64"], "artifactName": "clouddish-survey_${version}_${arch}.${ext}" }
       ],
       "icon": "assets/icon.png",
       "category": "Utility",
