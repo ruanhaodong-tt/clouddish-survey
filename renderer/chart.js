@@ -1,7 +1,7 @@
 'use strict';
 // 轻量 Canvas 图表，无第三方依赖
 const Charts = (function () {
-  const PALETTE = ['#4f46e5', '#7c3aed', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#8b5cf6', '#f43f5e', '#22c55e'];
+  const PALETTE = ['#8b4513', '#b5541f', '#7a7163', '#2e6b3f', '#b8860b', '#6b3410', '#9a7b4f', '#7f6734', '#a0522d', '#4a6741'];
 
   function setup(canvas) {
     const dpr = window.devicePixelRatio || 1;
