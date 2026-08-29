@@ -36,10 +36,7 @@
       { "from": "assets/icon.png", "to": "icon.png" }
     ],
     "win": {
-      "target": [
-        { "target": "portable", "arch": ["x64"], "artifactName": "CloudSurvey-${version}-win-portable.${ext}" },
-        { "target": "nsis", "arch": ["x64"], "artifactName": "CloudSurvey-${version}-win-setup.${ext}" }
-      ],
+      "target": ["portable", "nsis"],
       "icon": "assets/icon.png",
       "signAndEditExecutable": false
     },
@@ -48,13 +45,25 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "云问卷"
+      "shortcutName": "云问卷",
+      "artifactName": "CloudSurvey-${version}-win-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "CloudSurvey-${version}-win-portable.${ext}"
+    },
+    "deb": {
+      "artifactName": "clouddish-survey_${version}_${arch}.${ext}"
+    },
+    "appImage": {
+      "artifactName": "CloudSurvey-${version}-linux-x64.${ext}"
+    },
+    "win": {
+      "target": ["portable", "nsis"],
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false
     },
     "linux": {
-      "target": [
-        { "target": "AppImage", "arch": ["x64"], "artifactName": "CloudSurvey-${version}-linux-x64.${ext}" },
-        { "target": "deb", "arch": ["x64"], "artifactName": "clouddish-survey_${version}_${arch}.${ext}" }
-      ],
+      "target": ["AppImage", "deb"],
       "icon": "assets/icon.png",
       "category": "Utility",
       "maintainer": "一条大咸鱼"
