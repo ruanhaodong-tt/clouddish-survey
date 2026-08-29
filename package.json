@@ -1,6 +1,6 @@
 {
   "name": "clouddish-survey",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "云问卷：本地HTTP服务端 + 端口传输的问卷收集与管理工具",
   "main": "main.js",
   "author": "一条大咸鱼",
